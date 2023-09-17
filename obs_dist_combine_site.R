@@ -1,32 +1,41 @@
-## Clear environment
+# Clear environment
 rm(list = ls())
 
-## Clear commands
+# Clear commands
 cat("\014")
 
-# Set the working directory to source location
-setwd("~/MPhil/Code")
-
+# Load libraries
 library(nngeo)
 library(lubridate)
 library(tidyr)
-library(dplyr)           
+library(dplyr) 
+
+# Set the data path 
+data_path <- "../OneDrive - Queensland University of Technology/Documents/MPhil/Data"
 
 # Load the shapefile
-shapefile_path <- "../Data/GBRMPA/Management_Areas_of_the_Great_Barrier_Reef_Marine_Park/Management_Areas_of_the_Great_Barrier_Reef_Marine_Park.shp"
+shapefile_path <- paste0(data_path,
+                         "/GBRMPA",
+                         "/Management_Areas_of_the_Great_Barrier_Reef_Marine_Park/",
+                         "Management_Areas_of_the_Great_Barrier_Reef_Marine_Park.shp")
 sector_boundaries <- st_read(shapefile_path,
                              quiet = TRUE)
 
 ## Import Data ##
-cots_data_raw <- read.csv("../Data/GBRdata/CoTS_data.csv")
-cyc_data_raw <- read.csv("../Data/GBRdata/Cyclones_data.csv")
-dhw_data_raw <- read.csv("../Data/GBRdata/DHW_data.csv")
+cots_data_raw <- read.csv(paste0(data_path,
+                                 "/GBRdata/CoTS_data.csv"))
+cyc_data_raw <- read.csv(paste0(data_path,
+                                "/GBRdata/Cyclones_data.csv"))
+dhw_data_raw <- read.csv(paste0(data_path,
+                                "/GBRdata/DHW_data.csv"))
 
 ## Import AIMS by-site data ##
-aims_site <- read.csv("../Data/AIMS_manta-tow-by-reef/ltmp_data_by_site_OA.csv")
+aims_site <- read.csv(paste0(data_path,
+                             "/AIMS_manta-tow-by-reef/ltmp_data_by_site_OA.csv"))
 
 ## Import MMP Data by site ##
-mmp_data <- read.csv("../Data/AIMS_MMP/mmp_hc_sc_a_by_site.csv") 
+mmp_data <- read.csv(paste0(data_path,
+                            "/AIMS_MMP/mmp_hc_sc_a_by_site.csv")) 
 
 ## Format reef IDs and names, add report year column
 mmp_data$MMP_SITE_NAME <- gsub("Rf", "Reef", mmp_data$MMP_SITE_NAME)
@@ -294,4 +303,5 @@ for (i in seq_len(nrow(all_reefs_sf))) {
 } 
 
 # Save to an rds file
-saveRDS(all_reefs_sf, file = "../Data/all_reef_sites_sf.rds")
+saveRDS(all_reefs_sf, file = paste0(data_path,
+                                    "/all_reef_sites_sf.rds"))

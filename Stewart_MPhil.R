@@ -2,11 +2,12 @@
 # Clear environment
 rm(list = ls())
 
+# Clear plots
+if(!is.null(dev.list())) dev.off()
+
 # Clear commands
 cat("\014")
 
-# Set the working directory to source location
-#setwd("~/MPhil/Code")
 ############################################
 
 ##### LOAD LIBRARIES FUNCTIONS & DATA ######
@@ -27,7 +28,7 @@ library(ROI)              # R Optimization Infrastructure
 library(ggplot2)          # creates plots
 library(latex2exp)        # LaTeX for ggplot
 
-## Load disturbance and recovery calculators
+# Load disturbance and recovery calculators
 source('Stewart_MPhil_single_or_compound.R')
 source('Stewart_MPhil_ortiz_r_func.R')
 source('Stewart_MPhil_p_calc.R')
@@ -36,12 +37,22 @@ source('Stewart_MPhil_Optimiser_Compound.R')
 source('Stewart_MPhil_Sampler.R')
 source('Stewart_MPhil_Dist_Finder.R')
 
-## Load disturbances and coral obs (.rds made in code/obs_dist_combine.R)
-#all_reefs_sf <- readRDS(file = "../Data/all_reef_sites_sf.rds")
-all_reefs_sf <- readRDS(file = "../Data/all_reefs_sf_gaps_filled.rds")
+# Set the mphil path 
+mphil_path <- "../OneDrive - Queensland University of Technology/Documents/MPhil"
+
+# Set the data path 
+data_path <- paste0(mphil_path, "/Data")
+
+# Set the figure output path 
+out_path <- paste0(mphil_path, "/Figures/Data Chapter Outputs")
+
+# Load disturbances and coral obs (.rds made in code/obs_dist_combine.R)
+all_reefs_sf <- readRDS(file = paste0(data_path,
+                                      "/all_reefs_sf_gaps_filled.rds"))
 
 # Load the shapefile
-shapefile_path <- paste0("../Data/GBRMPA/Management_Areas_of_the_Great_Barrier",
+shapefile_path <- paste0(data_path,
+                         "/GBRMPA/Management_Areas_of_the_Great_Barrier",
                          "_Reef_Marine_Park/Management_Areas_of_the_Great_",
                          "Barrier_Reef_Marine_Park.shp")
 sector_boundaries <- st_read(shapefile_path,
@@ -69,13 +80,13 @@ mgmt_benefit <- 0.1
 mgmt_constraint <- 0.20
 
 ### Sensitivity values ###
-sens_recov_yrs <- c(1, 5, 10, 50)
-sens_recov_th <- c(0.5, 0.65, 0.85, 1)
-sens_mgmt_ben <- c(0.35, 0.5, 0.75, 1) #0.02, 0.05, 0.15, 0.2
+sens_recov_yrs <- c(1, 2, 5, 10, 15)
+sens_recov_th <- c(0.5, 0.65, 0.75, 0.85, 1)
+sens_mgmt_ben <- c(0.02, 0.05, 0.1, 0.15, 0.3)
 
 ### Simulations ###
 # Run simulations? (Much faster if you don't)
-run_simulations <- FALSE
+run_simulations <- TRUE
 
 # Set number of simulations, n_sims
 n_sims <- 100
@@ -526,18 +537,18 @@ ggplot(data = dumbbell_df,
         legend.box.just = "left",
         legend.margin = margin(0, 5, 4, 3))
 if (isTimeBased) {
-  ggsave(paste0("../MPhil Thesis/Dumbbell_TimeBased", 
+  ggsave(paste0(out_path, "/Dumbbell_TimeBased", 
                 recov_yrs, "yr", mgmt_benefit, "mgmt.png"), 
          plot = last_plot(), width=6, height=5)
 } else {
-  ggsave(paste0("../MPhil Thesis/Dumbbell_RecovBased", 
+  ggsave(paste0(out_path, "/Dumbbell_RecovBased", 
                 recov_th, "th", mgmt_benefit, "mgmt.png"), 
          plot = last_plot(), width=6, height=5)
 }
 ############################################
 
 # To Do:
-#   make density plot vis for impact of compounding on prob recovered state
+#   make raincloud vis for impact of compounding on prob recovered state
 
 ################# SAMPLING #################
 num_samples <- 100
@@ -570,84 +581,6 @@ print(paste("When only considering single disturbances, it is recommended to man
             "In the compound disturbance scenario, it is recommended to manage reef/s", 
             paste(reef_s_to_manage_c, collapse = ", "), "for an expected", 
             exp_recov_c, "reefs in a recovered state."))
-############################################
-
-############## SAMPLE OPT VIS ##############
-# Plot the sectors with different colours
-# sector_boundaries$AREA_DESCR <- factor(sector_boundaries$AREA_DESCR, 
-#                                        levels = gbr_name_order[4:1])
-# 
-# sample_reefs_df <- st_as_sf(sample_reefs_df, crs = st_crs(sector_boundaries))
-# 
-# sample_reefs_df$x <- st_coordinates(sample_reefs_df$geometry)[,1]
-# sample_reefs_df$y <- st_coordinates(sample_reefs_df$geometry)[,2]
-# 
-# sector_boundaries_fill <- sector_boundaries %>% 
-#   mutate(single_count = nrow(sample_reefs_df[sample_reefs_df$AREA_DESCR[reef_s_to_manage_s] == 
-#                                                AREA_DESCR,]), 
-#          compound_count = nrow(sample_reefs_df[sample_reefs_df$AREA_DESCR[reef_s_to_manage_c] == 
-#                                                  AREA_DESCR,]))
-# for (sector in sector_boundaries_fill$AREA_DESCR) {
-#   sector_boundaries_fill$single_count[sector_boundaries_fill$AREA_DESCR == sector] = 
-#     sum(sample_reefs_df$AREA_DESCR[reef_s_to_manage_s] == sector)
-#   sector_boundaries_fill$compound_count[sector_boundaries_fill$AREA_DESCR == sector] = 
-#     sum(sample_reefs_df$AREA_DESCR[reef_s_to_manage_c] == sector)
-# }
-# 
-# single_p <- ggplot() +
-#   geom_sf(data = sector_boundaries_fill,
-#           mapping = aes(fill = single_count), lwd = 0.01) +
-#   theme_classic() +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        tag = "A") +
-#   scale_fill_continuous(limits = c(min(sector_boundaries_fill$single_count, 
-#                                        sector_boundaries_fill$compound_count), 
-#                                    max(sector_boundaries_fill$single_count, 
-#                                        sector_boundaries_fill$compound_count))) +
-#   labs(fill = "Number of \nManaged Reefs") +
-#   theme(plot.tag = element_text()) + 
-#   annotate("text", x = 145, y = -24, 
-#            label = TeX(paste0("$E\\[R_{1}\\] = ", floor(actual_exp_recov_s), "$")),
-#            parse = TRUE) %>%
-#   suppressMessages()
-# 
-# compound_p <- ggplot() +
-#   geom_sf(data = sector_boundaries_fill,
-#           mapping = aes(fill = compound_count), lwd = 0.01) +
-#   theme_classic() +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        tag = "B") +
-#   scale_fill_continuous(limits = c(min(sector_boundaries_fill$single_count, 
-#                                        sector_boundaries_fill$compound_count), 
-#                                    max(sector_boundaries_fill$single_count, 
-#                                        sector_boundaries_fill$compound_count))) +
-#   theme(plot.tag = element_text()) +
-#   annotate("text", x = 145, y = -24, 
-#            label = TeX(paste0("$E\\[R_{2}\\] = ", floor(exp_recov_c), "$")),
-#            parse = TRUE) %>%
-#   suppressMessages()
-# 
-# ggarrange(single_p, compound_p, 
-#           ncol=2, nrow=1, 
-#           common.legend = TRUE, 
-#           legend="right") %>%
-#   suppressMessages()
-# 
-# if (isTimeBased) {
-#   ggsave(paste0("../MPhil Thesis/", 
-#                 num_samples, "Sample_Choropleth_TimeBased", 
-#                 recov_yrs, "yr", mgmt_benefit, "mgmt.png"), 
-#          plot = last_plot(), 
-#          width=8, height=5)
-# } else {
-#   ggsave(paste0("../MPhil Thesis/", 
-#                 num_samples, "Sample_Choropleth_RecovBased", 
-#                 recov_th, "th", mgmt_benefit, "mgmt.png"), 
-#          plot = last_plot(), 
-#          width=8, height=5)
-# }
 ############################################
 
 ############### SIMULATIONS ################
@@ -775,13 +708,13 @@ if (run_simulations) {
             legend="right")
   
   if (isTimeBased) {
-    ggsave(paste0("../MPhil Thesis/", 
+    ggsave(paste0(out_path, "/", 
                   n_sims, "Sim_Hexmap_TimeBased", 
                   recov_yrs, "yr", mgmt_benefit, "mgmt.png"), 
            plot = last_plot(), 
            width=8, height=5)
   } else {
-    ggsave(paste0("../MPhil Thesis/", 
+    ggsave(paste0(out_path, "/", 
                   n_sims, "Sim_Hexmap_RecovBased", 
                   recov_th, "th", mgmt_benefit, "mgmt.png"), 
            plot = last_plot(), 
@@ -791,29 +724,19 @@ if (run_simulations) {
 
 ############################################
 
-############## VISUALISATIONS ##############
-# Locations of (real) reefs in system
-ggplot() +
-  geom_sf(data = sector_boundaries,
-          mapping = aes(fill = AREA_DESCR), lwd = 0.01) +
-  theme_classic() +
-  labs(x = "Longitude",
-       y = "Latitude") +
-  scale_fill_brewer(name = "Region", palette = "Spectral") +
-  geom_sf(data = all_reefs_sf$geometry,
-          pch = 16,
-          color = "black",
-          alpha = 0.5)
-############################################
-
 ############# SAVE ENVIRONMENT #############
 if (isTimeBased) {
-  save.image(paste0("Parameter Run Environments/", 
-                    "TimeBased", recov_yrs, "yrs", mgmt_benefit, "mgmt.RData"))
+  save.image(paste0(data_path,
+                    "/Parameter Run Environments/", 
+                    "TimeBased", recov_yrs, "yrs", 
+                    mgmt_benefit, "mgmt.RData"))
 } else {
-  save.image(paste0("Parameter Run Environments/", 
-                    "RecovBased", recov_th, "th", mgmt_benefit, "mgmt.RData"))
+  save.image(paste0(data_path,
+                    "/Parameter Run Environments/", 
+                    "RecovBased", recov_th, "th", 
+                    mgmt_benefit, "mgmt.RData"))
 }
+############################################
 
 ############ LIBRARY GRAVEYARD #############
 # library(ncdf4)            # opens ".nc" files
@@ -834,108 +757,97 @@ if (isTimeBased) {
 
 ############# CODE GRAVEYARD ###############
 
-# This was a test to see if I can use reef name, or reef id in the disturbance
-# datasets. I think I can, but need to use the nearest reef 
-# total_flags <- 0
-# for (reef_name in unique(mmp_data$REEF_SITE_NAME)) {
-#   index <- grep(str_to_upper(reef_name), reefInfo$REEF_NAME)
-#   if (length(index) != 1) { # If there is no matching reef, find it by lat/lon
-#     latitude <- mmp_data$LATITUDE[mmp_data$REEF_SITE_NAME == reef_name][1]
-#     longitude <- mmp_data$LONGITUDE[mmp_data$REEF_SITE_NAME == reef_name][1]
-#     index <- match_nrst_haversine(
-#       lat = latitude,
-#       lon = longitude,
-#       addresses_lat = reefInfo$LAT_DD,
-#       addresses_lon = reefInfo$LONG_DD
-#     )$pos
-#   }
-#   reef_id <- reefInfo$REEF_ID[index]
-#   if (!any(grepl(reef_id, cots_data$REEF_ID)) &&
-#       !any(grepl(reef_id, dhw_data$REEF_ID)) &&
-#       !any(grepl(reef_id, cyclones_data$REEF_ID))){
-#     total_flags <- total_flags + 1
-#     
-#     # print the reef name, the closest reef and the distance away
-#     latitude <- mmp_data$LATITUDE[mmp_data$REEF_SITE_NAME == reef_name][1]
-#     longitude <- mmp_data$LONGITUDE[mmp_data$REEF_SITE_NAME == reef_name][1]
-#     closest <- match_nrst_haversine(
-#       lat = latitude,
-#       lon = longitude,
-#       addresses_lat = cots_data$LAT,
-#       addresses_lon = cots_data$LONG
-#     )
-#     print(paste(reef_name, reef_id, cots_data$REEF_NAME[closest$pos], cots_data$REEF_ID[closest$pos], closest$dist))
-#     
-#   }
-# } #25 / 33
-# 
-# total_flags <- 0
-# for (reef_id in unique(aims_reef$REEF_ID)) {
-#   if (!any(grepl(reef_id, cots_data$REEF_ID)) && 
-#       !any(grepl(reef_id, dhw_data$REEF_ID)) &&
-#       !any(grepl(reef_id, cyclones_data$REEF_ID))){
-#     total_flags <- total_flags + 1
-#   }
-# }#65/299
 ############################################
 
 ############### VIS GRAVEYARD ##############
-# map_data <- st_read(shapefile_path)
+
+# SAMPLE OPT VIS
+# Plot the sectors with different colours
+# sector_boundaries$AREA_DESCR <- factor(sector_boundaries$AREA_DESCR, 
+#                                        levels = gbr_name_order[4:1])
 # 
-# # Leaflet plot of sectors
-# leaflet() %>%
-#   addTiles() %>%
-#   addPolygons(data = map_data, 
-#               popup = ~AREA_DESCR,
-#               color = "blue",
-#               opacity = 1,
-#               weight = 1)
+# sample_reefs_df <- st_as_sf(sample_reefs_df, crs = st_crs(sector_boundaries))
 # 
-# leaflet() %>%
-#   addProviderTiles("Esri.WorldGrayCanvas") %>%
-#   addPolygons(data = map_data, 
-#               popup = ~SECTOR_NAM,
-#               color = "darkgrey",
-#               opacity = 1,
-#               weight = 1)
+# sample_reefs_df$x <- st_coordinates(sample_reefs_df$geometry)[,1]
+# sample_reefs_df$y <- st_coordinates(sample_reefs_df$geometry)[,2]
 # 
+# sector_boundaries_fill <- sector_boundaries %>% 
+#   mutate(single_count = nrow(sample_reefs_df[sample_reefs_df$AREA_DESCR[reef_s_to_manage_s] == 
+#                                                AREA_DESCR,]), 
+#          compound_count = nrow(sample_reefs_df[sample_reefs_df$AREA_DESCR[reef_s_to_manage_c] == 
+#                                                  AREA_DESCR,]))
+# for (sector in sector_boundaries_fill$AREA_DESCR) {
+#   sector_boundaries_fill$single_count[sector_boundaries_fill$AREA_DESCR == sector] = 
+#     sum(sample_reefs_df$AREA_DESCR[reef_s_to_manage_s] == sector)
+#   sector_boundaries_fill$compound_count[sector_boundaries_fill$AREA_DESCR == sector] = 
+#     sum(sample_reefs_df$AREA_DESCR[reef_s_to_manage_c] == sector)
+# }
 # 
-# leaflet(options = leafletOptions(zoomControl = FALSE)) %>%
-#   addProviderTiles("Esri.WorldImagery") %>%
-#   addPolygons(data = map_data, 
-#               popup = ~SECTOR_NAM,
-#               color = "lightgray",
-#               opacity = 1,
-#               weight = 1)
-# addTiles('http://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/Mapserver/tile/{z}/{y}/{x}',
-#          group = "Labels",
-#          labelOptions = labelOptions(direction = "bottom")) %>% 
-#addLayersControl( overlayGroups = names(layers[1:2]),
-#addLayersControl( overlayGroups = names(layers[1:length(layers)]),
-#                  options = layersControlOptions(collapsed=FALSE))
-# ggplot(dumbbell_df, 
-#        aes(x = value, y = section)) +
-#   geom_line() +
-#   geom_point(aes(color = variable), size = 3) +
-#   scale_color_brewer(palette = "Set1", direction = -1) +
-#   theme(legend.position = "bottom")
+# single_p <- ggplot() +
+#   geom_sf(data = sector_boundaries_fill,
+#           mapping = aes(fill = single_count), lwd = 0.01) +
+#   theme_classic() +
+#   labs(x = "Longitude",
+#        y = "Latitude",
+#        tag = "A") +
+#   scale_fill_continuous(limits = c(min(sector_boundaries_fill$single_count, 
+#                                        sector_boundaries_fill$compound_count), 
+#                                    max(sector_boundaries_fill$single_count, 
+#                                        sector_boundaries_fill$compound_count))) +
+#   labs(fill = "Number of \nManaged Reefs") +
+#   theme(plot.tag = element_text()) + 
+#   annotate("text", x = 145, y = -24, 
+#            label = TeX(paste0("$E\\[R_{1}\\] = ", floor(actual_exp_recov_s), "$")),
+#            parse = TRUE) %>%
+#   suppressMessages()
 # 
-# ggplot() + 
-#   geom_dumbbell(data = section_dr, 
-#                 aes(y = section,
-#                     x = pr_recov_sing_unprot, 
-#                     xend = pr_recov_comp_unprot),
-#                 shape = 16,
-#                 size = 1, color = "azure3",
-#                 size_x = 3, colour_x = "steelblue1",
-#                 size_xend = 3, colour_xend = "steelblue4") +
-#   scale_y_reverse() +
-#   theme_light() +
-#   theme(panel.grid.minor = element_blank(),
-#         panel.grid.major.y = element_blank()) +
-#   labs(x = "Probability the Reef is Recovered",
-#        y = "Section of GBR") +
-#   scale_color_manual(name = "", 
-#                      values = c("azure3", "steelblue1", "steelblue4"))
+# compound_p <- ggplot() +
+#   geom_sf(data = sector_boundaries_fill,
+#           mapping = aes(fill = compound_count), lwd = 0.01) +
+#   theme_classic() +
+#   labs(x = "Longitude",
+#        y = "Latitude",
+#        tag = "B") +
+#   scale_fill_continuous(limits = c(min(sector_boundaries_fill$single_count, 
+#                                        sector_boundaries_fill$compound_count), 
+#                                    max(sector_boundaries_fill$single_count, 
+#                                        sector_boundaries_fill$compound_count))) +
+#   theme(plot.tag = element_text()) +
+#   annotate("text", x = 145, y = -24, 
+#            label = TeX(paste0("$E\\[R_{2}\\] = ", floor(exp_recov_c), "$")),
+#            parse = TRUE) %>%
+#   suppressMessages()
 # 
+# ggarrange(single_p, compound_p, 
+#           ncol=2, nrow=1, 
+#           common.legend = TRUE, 
+#           legend="right") %>%
+#   suppressMessages()
+# 
+# if (isTimeBased) {
+#   ggsave(paste0("../MPhil Thesis/", 
+#                 num_samples, "Sample_Choropleth_TimeBased", 
+#                 recov_yrs, "yr", mgmt_benefit, "mgmt.png"), 
+#          plot = last_plot(), 
+#          width=8, height=5)
+# } else {
+#   ggsave(paste0("../MPhil Thesis/", 
+#                 num_samples, "Sample_Choropleth_RecovBased", 
+#                 recov_th, "th", mgmt_benefit, "mgmt.png"), 
+#          plot = last_plot(), 
+#          width=8, height=5)
+# }
+
+# # Locations of (real) reefs in system
+# ggplot() +
+#   geom_sf(data = sector_boundaries,
+#           mapping = aes(fill = AREA_DESCR), lwd = 0.01) +
+#   theme_classic() +
+#   labs(x = "Longitude",
+#        y = "Latitude") +
+#   scale_fill_brewer(name = "Region", palette = "Spectral") +
+#   geom_sf(data = all_reefs_sf$geometry,
+#           pch = 16,
+#           color = "black",
+#           alpha = 0.5)
 ############################################

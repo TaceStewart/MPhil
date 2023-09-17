@@ -3,15 +3,19 @@ dist_finder <- function(df, isTimeBased, recov_th, recov_yrs,
   
   # df <- sample_reefs_df #test
   # Load the shapefile
-  shapefile_path <- paste0("../Data/GBRMPA/Management_Areas_of_the_Great_Barrier",
+  shapefile_path <- paste0(data_path,
+                           "/GBRMPA/Management_Areas_of_the_Great_Barrier",
                            "_Reef_Marine_Park/Management_Areas_of_the_Great_",
                            "Barrier_Reef_Marine_Park.shp")
   sector_boundaries <- st_read(shapefile_path, quiet = TRUE)
   
   # Import Data
-  cots_data_raw <- read.csv("../Data/GBRdata/CoTS_data.csv")
-  cyc_data_raw <- read.csv("../Data/GBRdata/Cyclones_data.csv")
-  dhw_data_raw <- read.csv("../Data/GBRdata/DHW_data.csv")
+  cots_data_raw <- read.csv(paste0(data_path,
+                                   "/GBRdata/CoTS_data.csv"))
+  cyc_data_raw <- read.csv(paste0(data_path,
+                                  "/GBRdata/Cyclones_data.csv"))
+  dhw_data_raw <- read.csv(paste0(data_path,
+                                  "/GBRdata/DHW_data.csv"))
   
   # Create spatial points for the reefs using the longitude and latitude coordinates
   df <- st_as_sf(df, 

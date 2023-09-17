@@ -1,7 +1,24 @@
+# Clear environment
+rm(list = ls())
+
+# Clear commands
+cat("\014")
+
+# Load libraries
+library(nngeo)
+library(lubridate)
+library(tidyr)
+library(dplyr) 
+
+# Set the data path 
+data_path <- "../OneDrive - Queensland University of Technology/Documents/MPhil/Data"
+
 # figure out where the gaps are in ltmp dataset summd by reef, that can be 
 # filled by the by-site
-all_reefs <- readRDS(file = "../Data/all_reefs_sf.rds")
-all_sites <- readRDS(file = "../Data/all_reef_sites_sf.rds")
+all_reefs <- readRDS(file = paste0(data_path,
+                                   "/all_reefs_sf.rds"))
+all_sites <- readRDS(file = paste0(data_path,
+                                   "/all_reef_sites_sf.rds"))
 
 ltmp_reefs <- all_reefs[all_reefs$PROGRAM == "LTMP",]
 ltmp_sites <- all_sites[all_sites$PROGRAM == "LTMP",]
@@ -36,7 +53,6 @@ for (reef_name in reef_names) {
   site_years <- unique(site_obs$YEAR)
   
   if (any(!(site_years %in% reef_years))) {
-    print(paste(reef_name, site_name))
     count <- count + sum(!(site_years %in% reef_years))
     
     site_means <- site_obs %>%
@@ -47,22 +63,20 @@ for (reef_name in reef_names) {
                 meanDHW = mean(DHW_value)) %>%
       ungroup()
     
-    reefplot <- ggplot() +
-      geom_point(data = reef_obs,
-                 mapping = aes(x = YEAR, y = COVER),
-                 colour = "red") +
-      geom_line(data = reef_obs,
-                mapping = aes(x = YEAR, y = COVER),
-                colour = "red") +
-      geom_point(data = site_means,
-                 mapping = aes(x = YEAR, y = meanCOVER),
-                 colour = "blue") +
-      geom_line(data = site_means,
-                mapping = aes(x = YEAR, y = meanCOVER),
-                colour = "blue") +
-      scale_y_continuous(limits = c(0,100))
-    
-    print(reefplot)
+    # reefplot <- ggplot() +
+    #   geom_point(data = reef_obs,
+    #              mapping = aes(x = YEAR, y = COVER),
+    #              colour = "red") +
+    #   geom_line(data = reef_obs,
+    #             mapping = aes(x = YEAR, y = COVER),
+    #             colour = "red") +
+    #   geom_point(data = site_means,
+    #              mapping = aes(x = YEAR, y = meanCOVER),
+    #              colour = "blue") +
+    #   geom_line(data = site_means,
+    #             mapping = aes(x = YEAR, y = meanCOVER),
+    #             colour = "blue") +
+    #   scale_y_continuous(limits = c(0,100))
     
     for (index in which(!(site_years %in% reef_years))) {
       all_reefs[nrow(all_reefs) + 1,] <- data.frame(reef_name, 
@@ -83,4 +97,5 @@ for (reef_name in reef_names) {
 all_reefs_sorted <- all_reefs[order(all_reefs$REEF_NAME, all_reefs$YEAR),]
 
 # Save to an rds file
-saveRDS(all_reefs_sorted, file = "../Data/all_reefs_sf_gaps_filled.rds")
+saveRDS(all_reefs_sorted, file = paste0(data_path,
+                                        "/all_reefs_sf_gaps_filled.rds"))
