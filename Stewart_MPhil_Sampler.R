@@ -53,7 +53,7 @@ sampler <- function(reef_df, sector_boundaries, num_samples, isTimeBased,
                                                                          reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]],
                                                         reefs_per_mgmt,
                                                         replace = TRUE)
-    } else {
+    } else { # Sampler needs to deal with unknowns better. Also, should sampling be from the data in the first place?
       mgmt_index <- sector_boundaries$AREA_DESCR == unique_mgmts[row-1]
       from_row <- (row - 2)*reefs_per_mgmt + 1
       to_row <- (row-1)*reefs_per_mgmt
