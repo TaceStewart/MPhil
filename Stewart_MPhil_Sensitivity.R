@@ -10,6 +10,12 @@ cat("\014")
 
 ############################################
 
+############## LOAD LIBARIES ###############
+library(ggplot2)
+library(dplyr)
+
+############################################
+
 ############## SET VARIABLES ###############
 # Variables
 base_recov_yrs <- 2
@@ -46,49 +52,171 @@ load(paste0(data_path, "/Parameter Run Environments/RecovBased",
             base_recov_th, "th", 
             base_mgmt_ben, "mgmt.RData"))
 ground_truth_df <- data.frame(REEF_NAME = unique(all_reefs_sf$REEF_NAME),
-                              single_years = NA,
-                              compound_years = NA)
+                              single_years = "",
+                              compound_years = "")
 for (reef in 1:nrow(ground_truth_df)) {
   reef_name <- ground_truth_df$REEF_NAME[reef]
   reef_obs <- all_reefs_sf[all_reefs_sf$REEF_NAME == reef_name,]
   if (any(reef_obs$single_or_compound == "Single", na.rm = T)) {
     single_indices <- which(reef_obs$single_or_compound == "Single")
-    for(index in single_indices) {
+    for(index in rev(single_indices)) {
       ground_truth_df$single_years[reef] <- reef_obs$recovTime[index] %>% 
         is.na() %>%
-        ifelse(max(reef_obs$YEAR), reef_obs$recovYear[index]) %>%
+        ifelse(max(reef_obs$YEAR), as.integer(reef_obs$recovYear[index]) - 1) %>%
         seq(from = reef_obs$YEAR[index], to = .) %>%
         paste(collapse = ", ") %>%
-        paste(ground_truth_df$single_years[reef], collapse = ", ") %>%
-        gsub(pattern = " NA", replacement = "", x = .)
+        paste(ground_truth_df$single_years[reef], sep = ", ")
     }
   } 
   if (any(reef_obs$single_or_compound == "Compound", na.rm = T)) {
     compound_indices <- which(reef_obs$single_or_compound == "Compound")
-    for(index in compound_indices) {
+    for(index in rev(compound_indices)) {
       ground_truth_df$compound_years[reef] <- reef_obs$recovTime[index] %>% 
         is.na() %>%
-        ifelse(max(reef_obs$YEAR), as.integer(reef_obs$recovYear[index])) %>%
-        seq(from = 2002, to = (.)) %>%
-        list(ground_truth_df$compound_years[reef]) %>%
-        gsub(pattern = " NA", replacement = "", x = .)
+        ifelse(max(reef_obs$YEAR), as.integer(reef_obs$recovYear[index]) - 1) %>%
+        seq(from = reef_obs$YEAR[index], to = .) %>%
+        paste(collapse = ", ") %>%
+        paste(ground_truth_df$compound_years[reef], sep = ", ")
     }
     
   } 
 }
+
 # Need to store years of single and compound dists at each reef in each parcombo
 time_sens_parcombos <- expand.grid(X=list_recov_yrs, Y=list_mgmt_ben)
 colnames(time_sens_parcombos) <- c("recov_yr", "mgmt_ben")
-for (par_combo in 1:nrow(time_sens_df)) {
-  recov_yr_val <- time_sens_df$recov_yr[par_combo]
-  mgmt_ben_val <- time_sens_df$mgmt_ben[par_combo]
+time_sens_parcombos <- time_sens_parcombos %>%
+  mutate(perc_same_single = NA,
+         perc_false_single = NA,
+         perc_same_comp = NA,
+         perc_false_comp = NA)
+for (parcombo_row in 1:nrow(time_sens_parcombos)) {
+  recov_yr_val <- time_sens_parcombos$recov_yr[parcombo_row]
+  mgmt_ben_val <- time_sens_parcombos$mgmt_ben[parcombo_row]
   
   load(paste0(data_path, "/Parameter Run Environments/TimeBased", 
               recov_yr_val, "yrs", 
               mgmt_ben_val, "mgmt.RData"))
+  same_single_vec <- c()
+  false_single_vec <- c()
+  same_compound_vec <- c()
+  false_compound_vec <- c()
+  # Create df similar to ground truth
+  for (reef in 1:nrow(ground_truth_df)) {
+    reef_name <- ground_truth_df$REEF_NAME[reef]
+    reef_obs <- all_reefs_sf[all_reefs_sf$REEF_NAME == reef_name,]
+    reef_single_yrs <- c()
+    if (any(reef_obs$single_or_compound == "Single", na.rm = T)) {
+      single_indices <- which(reef_obs$single_or_compound == "Single")
+      for(index in rev(single_indices)) {
+        reef_single_yrs <- reef_obs$recovTime[index] %>% 
+          is.na() %>%
+          ifelse(max(reef_obs$YEAR), as.integer(reef_obs$recovYear[index]) - 1) %>%
+          seq(from = reef_obs$YEAR[index], to = .) %>%
+          append(reef_single_yrs)
+      }
+    } 
+    if (any(reef_obs$single_or_compound == "Compound", na.rm = T)) {
+      compound_indices <- which(reef_obs$single_or_compound == "Compound")
+      reef_compound_yrs <- c()
+      for(index in rev(compound_indices)) {
+        reef_compound_yrs <- reef_obs$recovTime[index] %>% 
+          is.na() %>%
+          ifelse(max(reef_obs$YEAR), as.integer(reef_obs$recovYear[index]) - 1) %>%
+          seq(from = reef_obs$YEAR[index], to = .)  %>%
+          append(reef_compound_yrs)
+      }
+    } 
+    
+    # Evaluate % same single and compound
+    ground_truth_reef_single <- ground_truth_df$single_years[reef] %>%
+      strsplit(", ") %>%
+      unlist() %>%
+      as.numeric()
+    ground_truth_reef_comp <- ground_truth_df$compound_years[reef] %>%
+      strsplit(", ") %>%
+      unlist() %>%
+      as.numeric()
+    
+    # Calc % of the parcombo reef single years are in gt single years
+    if (length(ground_truth_reef_single) > 0) {
+      perc_same_single <- sum(reef_single_yrs %in% ground_truth_reef_single)/
+        length(ground_truth_reef_single)
+      same_single_vec <- ifelse(is.nan(perc_same_single),
+                                0, perc_same_single) %>%
+        append(same_single_vec)
+    } else {
+      same_single_vec <- ifelse(length(reef_single_yrs) > 0,
+                                0, 1) %>%
+        append(same_single_vec)
+    }
+    
+    # Calc % of the parcombo reef single years are not in gt single years
+    if (length(reef_single_yrs) > 0) {
+      perc_false_single <- sum(!(reef_single_yrs %in% ground_truth_reef_single))/
+        length(reef_single_yrs)
+      false_single_vec <- ifelse(is.nan(perc_same_single),
+                                 0, perc_same_single) %>%
+        append(false_single_vec)
+    } else {
+      false_single_vec <- ifelse(length(ground_truth_reef_single) > 0,
+                                 0,1) %>%
+        append(false_single_vec)
+    }
+    
+    # Calc % of the parcombo reef compound years are in gt compound years
+    if (length(ground_truth_reef_comp) > 0) {
+      perc_same_comp <- sum(reef_compound_yrs %in% ground_truth_reef_comp)/
+        length(ground_truth_reef_comp)
+      same_compound_vec <- ifelse(is.nan(perc_same_comp),
+                                  0, perc_same_comp) %>%
+        append(same_compound_vec)
+    } else {
+      same_compound_vec <- ifelse(length(reef_compound_yrs) > 0,
+                                  0,1) %>%
+        append(same_compound_vec)
+    }
+    
+    # Calc % of the parcombo reef compound years are not in gt compound years
+    if (length(reef_compound_yrs) > 0) {
+      perc_false_comp <- sum(!(reef_compound_yrs %in% ground_truth_reef_comp))/
+        length(reef_compound_yrs)
+      false_compound_vec <- ifelse(is.nan(perc_false_comp),
+                                   0, perc_false_comp) %>%
+        append(false_compound_vec)
+    } else {
+      false_compound_vec <- ifelse(length(ground_truth_reef_comp) > 0,
+                                   0,1) %>%
+        append(false_compound_vec)
+    }
+  }
   
-  
+  time_sens_parcombos$perc_same_single[parcombo_row] <- mean(same_single_vec)
+  time_sens_parcombos$perc_false_single[parcombo_row] <- mean(false_single_vec)
+  time_sens_parcombos$perc_same_comp[parcombo_row] <- mean(same_compound_vec)
+  time_sens_parcombos$perc_false_comp[parcombo_row] <- mean(false_compound_vec)
 }
+time_sens_plot_df <- melt(time_sens_parcombos[time_sens_parcombos$mgmt_ben == 0.1,], 
+                id = c("recov_yr", "mgmt_ben"))
+ggplot(time_sens_plot_df,
+       aes(x = variable, 
+           y = value, 
+           fill = as.factor(recov_yr))) +
+  geom_bar(stat = 'identity',
+           position = 'dodge') +
+  theme_classic() + 
+  scale_fill_manual(values=brewer.pal(9, "Blues")[3:6]) +
+  labs(x = "Metric Measured Against Recovery-Overlap",
+       y = "Percent",
+       fill  = "Estimated\nRecovery\nTime (Years)") +
+  scale_x_discrete(labels = c("Same Single\nDisturbances",
+                              "False Single\nDisturbances",
+                              "Same Compound\nDisturbances",
+                              "False Compound\nDisturbances"))
+
+ggsave(paste0(out_path, "/DHSensitivity_RecoveryTime.png"), 
+       plot = last_plot(), 
+       width=8, height=5)
 
 
 ############################################
