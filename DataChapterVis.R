@@ -17,13 +17,25 @@ library(hexbin)
 ##########################################
 
 ############## LOAD DATA #########
+
+# Set the mphil path 
+mphil_path <- "../OneDrive - Queensland University of Technology/Documents/MPhil"
+
+# Set the data path 
+data_path <- paste0(mphil_path, "/Data")
+
+# Set the figure output path 
+out_path <- paste0(mphil_path, "/Figures/Sensitivity Outputs")
+
 # Load the shapefile
-shapefile_path <- "../Data/GBRMPA/Management_Areas_of_the_Great_Barrier_Reef_Marine_Park/Management_Areas_of_the_Great_Barrier_Reef_Marine_Park.shp"
+shapefile_path <- paste0(data_path, 
+                         "/GBRMPA/Management_Areas_of_the_Great_Barrier_Reef_Marine_Park/Management_Areas_of_the_Great_Barrier_Reef_Marine_Park.shp")
 map_data <- st_read(shapefile_path)
 
 # Load .RData
 #load("~/MPhil/Code/Parameter Run Environments/RecovBased0.75th0.1mgmt.RData")
-load("Parameter Run Environments/TimeBased5yrs0.1mgmt.RData")
+load(paste0(data_path, 
+            "/Parameter Run Environments/TimeBased5yrs0.1mgmt.RData"))
 #load("Parameter Run Environments/RecovBased0.75th0.1mgmt.RData")
 ##########################################
 
@@ -31,8 +43,14 @@ load("Parameter Run Environments/TimeBased5yrs0.1mgmt.RData")
 allreefs_xy <- st_coordinates(all_reefs_sf)
 all_reefs_sf$X <- allreefs_xy[,1]
 all_reefs_sf$Y <- allreefs_xy[,2]
- 
+landscape_dims <- c(8,4)
+portrait_dims <- c(5,6)
+
 ##### Management Areas (Crop after) ######
+rebe_coords_xy <- all_reefs_sf$geometry[which(grepl("Rebe", 
+                                                    all_reefs_sf$REEF_NAME,
+                                                    ignore.case = T))] %>% 
+  st_coordinates()
 coordinates_xy <- st_coordinates(all_reefs_sf$geometry)
 map_data$NUM_REEFS <- 0
 unique_rfs <- unique(all_reefs_sf[, c("REEF_NAME", "AREA_DESCR")])
@@ -69,13 +87,28 @@ leaflet() %>%
                                                     "color" = "grey",
                                                     "font-weight" = "bold",
                                                     "font-size" = "12px"))) %>%
+  addCircleMarkers(lng = mean(rebe_coords_xy[,1]),
+                   lat = mean(rebe_coords_xy[,2]),
+                   color = "lightcoral",
+                   opacity = 1,
+                   weight = 4,
+                   radius = 5,
+                   fill = FALSE) %>%
+  addLabelOnlyMarkers(lng = mean(rebe_coords_xy[,1] + 1),
+                      lat = mean(rebe_coords_xy[,2]),
+                      label = "Rebe Reef",
+                      labelOptions = labelOptions(noHide = T, 
+                                                  textOnly = TRUE, 
+                                                  direction = "right",
+                                                  style = list(
+                                                    "color" = "lightcoral",
+                                                    "font-weight" = "bold",
+                                                    "font-size" = "18px"))) %>%
   saveWidget("gbrmpaMA.html")
 webshot("gbrmpaMA.html", 
         "../MPhil Thesis/Figures/Data Chapter/Aus_GBR_FourMAs.png",
         vwidth = 700, vheight = 500, zoom = 8)
 
-landscape_dims <- c(8,4)
-portrait_dims <- c(5,6)
 ##########################################
 
 ##### Aims monitoring locs by program ####
@@ -173,10 +206,7 @@ summarised_reefs <- all_reefs_sf %>%
 ##########################################
 
 ##### Rebe Reef location (Crop after) #####
-rebe_coords_xy <- all_reefs_sf$geometry[which(grepl("Rebe", 
-                                                    all_reefs_sf$REEF_NAME,
-                                                    ignore.case = T))] %>% 
-  st_coordinates()
+
 leaflet() %>%
   setView(lng = mean(rebe_coords_xy[,1]) - 1, 
           lat = mean(rebe_coords_xy[,2]) + 1, 
