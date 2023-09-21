@@ -14,6 +14,7 @@ library(htmlwidgets)
 library(htmltools)
 library(webshot)
 library(hexbin)
+library(latex2exp)
 ##########################################
 
 ############## LOAD DATA #########
@@ -34,9 +35,10 @@ map_data <- st_read(shapefile_path)
 
 # Load .RData
 #load("~/MPhil/Code/Parameter Run Environments/RecovBased0.75th0.1mgmt.RData")
-load(paste0(data_path, 
-            "/Parameter Run Environments/TimeBased5yrs0.1mgmt.RData"))
-#load("Parameter Run Environments/RecovBased0.75th0.1mgmt.RData")
+load(paste0(data_path,
+           "/Parameter Run Environments/TimeBased5yrs0.1mgmt.RData"))
+# load(paste0(data_path, 
+#             "/Parameter Run Environments/RecovBased0.75th0.1mgmt.RData"))
 ##########################################
 
 #### FOR THESIS DATA CHAPTER ####
@@ -495,6 +497,95 @@ ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCOTSwithdistlvl.png",
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
+######## Rebe single and compound ########
+rebe_reef$distYears <- ifelse(is.na(rebe_reef$yearDists), NA, rebe_reef$YEAR)
+SingCompDistYears <- ifelse(is.na(rebe_reef$single_or_compound), NA, rebe_reef$YEAR)
+ggplot(data = rebe_reef,
+       mapping = aes(x = YEAR, 
+                     y = COVER)) +
+  theme_classic() +
+  geom_rect(xmin = SingCompDistYears, 
+            xmax = ifelse(grepl("Unknown", rebe_reef$recovYear), 
+                          Inf,
+                          as.numeric(rebe_reef$recovYear)), 
+            ymin = -Inf, ymax = Inf,
+            mapping = aes(fill = rebe_reef$single_or_compound),
+            alpha = .3,
+            na.rm = TRUE) + 
+  scale_fill_manual(name = "Event Type",
+                      values = c("orange", "yellow"),
+                      na.translate = F) +
+  geom_point(colour = "azure4",
+             size = 1.5,
+             alpha = 0.75) +
+  geom_line(colour = "azure4",
+            linewidth = 1,
+            alpha = 0.75) +
+  geom_vline(mapping = aes(xintercept = rebe_reef$distYears, 
+                           colour = rebe_reef$yearDists),
+             na.rm = TRUE,
+             linewidth = 1)  + 
+  scale_colour_manual(na.translate = F,
+                      values = colors) +
+  labs(x = "Year",
+       y = "Cover (%)",
+       colour = "Disturbance Type") + 
+  scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
+  scale_y_continuous(limits = c(0,50), 
+                     breaks = seq(0, 50, 10))
+if (isTimeBased) {
+  ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCompoundandSingleTimeBasedWithDist.png", 
+         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
+} else {
+  ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCompoundandSingleRecovBasedWithDist.png", 
+         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
+}
+##########################################
+
+######## Rebe single and compound ########
+rebe_reef$distYears <- ifelse(is.na(rebe_reef$yearDists), NA, rebe_reef$YEAR)
+SingCompDistYears <- ifelse(is.na(rebe_reef$single_or_compound), NA, rebe_reef$YEAR)
+ggplot(data = rebe_reef,
+       mapping = aes(x = YEAR, 
+                     y = COVER)) +
+  theme_classic() +
+  geom_rect(xmin = SingCompDistYears, 
+            xmax = ifelse(grepl("Unknown", rebe_reef$recovYear), 
+                          Inf,
+                          as.numeric(rebe_reef$recovYear)), 
+            ymin = -Inf, ymax = Inf,
+            mapping = aes(fill = rebe_reef$single_or_compound),
+            alpha = .3,
+            na.rm = TRUE) + 
+  scale_fill_manual(name = "Event Type",
+                    values = c("orange", "yellow"),
+                    na.translate = F) +
+  geom_point(colour = "azure4",
+             size = 1.5,
+             alpha = 0.75) +
+  geom_line(colour = "azure4",
+            linewidth = 1,
+            alpha = 0.75) +
+  geom_vline(mapping = aes(xintercept = rebe_reef$distYears), 
+             colour = "gray40",
+             na.rm = TRUE,
+             linewidth = 1) +
+  labs(x = "Year",
+       y = "Cover (%)",
+       colour = "Disturbance Type") + 
+  scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
+  scale_y_continuous(limits = c(0,50), 
+                     breaks = seq(0, 50, 10))
+if (isTimeBased) {
+  ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCompoundandSingleTimeBased.png", 
+         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
+} else {
+  ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCompoundandSingleRecovBased.png", 
+         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
+}
+##########################################
+
+reef_name <- "HASTINGS REEF"
 ######## Rebe single and compound ########
 rebe_reef$distYears <- ifelse(is.na(rebe_reef$yearDists), NA, rebe_reef$YEAR)
 SingCompDistYears <- ifelse(is.na(rebe_reef$single_or_compound), NA, rebe_reef$YEAR)
