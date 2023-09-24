@@ -1,61 +1,93 @@
+# Ideally this script will create 1000 samples, find the nearest environmental obs
+# translate them to disturbance obs, find the nearest coral obs, calculate 
+# d_{i,k} and r_{i,k} and save as a data frame to load into the main program
 
-num_samples <- 1000
-reefs_per_mgmt <- num_samples/nrow(sector_boundaries)
-cots_dist <- 1 # cots per tow
-cyc_dist <- 10 # hours of 4m wave height
-dhw_dist <- 4  # degree heating weeks
+########### SET UP THE WORKSPACE ###########
+# Clear environment
+rm(list = ls())
 
-# Initialise a list of random points
-random_points <- vector("integer", length = )
+# Clear plots
+if(!is.null(dev.list())) dev.off()
 
-# Get random locations in each management area for sample reefs 
-for (row in 1:nrow(sector_boundaries)) {
-  from_row <- (row - 1)*reefs_per_mgmt + 1
-  to_row <- row*reefs_per_mgmt
-  random_points[from_row:to_row] <- sector_boundaries$geometry[1] %>%
-    st_sample(size = reefs_per_mgmt, 
-              type = "random")
-}
+# Clear commands
+cat("\014")
 
-# Extract coordinates and create a data frame
-coordinates <- lapply(random_points, sf::st_coordinates)
-sample_reefs_df <- data.frame(x = sapply(coordinates, function(x) x[, 1]),
-                              y = sapply(coordinates, function(x) x[, 2]))
+############################################
 
-# Rename columns
-colnames(sample_reefs_df) <- c("LONGITUDE", "LATITUDE")
+##### LOAD LIBRARIES FUNCTIONS & DATA ######
+# Load Libraries
+library(sf)               # spatial feature handling
+library(lwgeom)           # spatial feature handling
+library(dplyr)            # dataframe manipulation
+library(varhandle)        # handles variables
+library(ompr)             # Optimization Modeling Package for R
+library(ompr.roi)         # Optimization Modeling Package for R, ROI solver
+library(reshape2)         # reshape data
+library(nngeo)            # k-Nearest Neighbor Join for Spatial Data
+library(lubridate)        # easy and fast parsing of date-times
+library(tidyr)            # tidy data
+library(ggpubr)           # arranging plots
+library(ROI.plugin.glpk)  # GNU Linear Programming Kit
+library(ROI)              # R Optimization Infrastructure
+library(ggplot2)          # creates plots
+library(latex2exp)        # LaTeX for ggplot
 
-# Assign hexagon IDs and sample values
-df <- sample_reefs_df %>%
-  mutate(point_id = row_number(),
-         d_single = 0,
-         d_comp = 0,
-         r_single = 0,
-         r_comp = 0)
+# Set the mphil path 
+mphil_path <- "../OneDrive - Queensland University of Technology/Documents/MPhil"
+
+# Set the data path 
+data_path <- paste0(mphil_path, "/Data")
+
+# Load disturbances and coral obs (.rds made in code/obs_dist_combine.R)
+all_reefs_sf <- readRDS(file = paste0(data_path,
+                                      "/all_reefs_sf_gaps_filled.rds"))
 
 # Load the shapefile
 shapefile_path <- paste0(data_path,
                          "/GBRMPA/Management_Areas_of_the_Great_Barrier",
                          "_Reef_Marine_Park/Management_Areas_of_the_Great_",
                          "Barrier_Reef_Marine_Park.shp")
-sector_boundaries <- st_read(shapefile_path, quiet = TRUE)
+sector_boundaries <- st_read(shapefile_path,
+                             quiet = TRUE)
 
-# Import Data
+# Import Environment Data
 cots_data_raw <- read.csv(paste0(data_path,
                                  "/GBRdata/CoTS_data.csv"))
 cyc_data_raw <- read.csv(paste0(data_path,
                                 "/GBRdata/Cyclones_data.csv"))
 dhw_data_raw <- read.csv(paste0(data_path,
                                 "/GBRdata/DHW_data.csv"))
+############################################
 
-# Create spatial points for the reefs using the longitude and latitude coordinates
-df <- st_as_sf(df, 
-               coords = c("LONGITUDE", "LATITUDE"), 
-               crs = st_crs(sector_boundaries))
+###### SET VARIABLES TO CHANGE ON RUN ######
+num_samples <- 1000
+reefs_per_mgmt <- num_samples/nrow(sector_boundaries)
+############################################
 
-# Perform a spatial join to determine which area each reef belongs to
-df <- st_join(df, sector_boundaries[, "AREA_DESCR"])
+####### INITIALISE VARIABLES AND DFS #######
+# Minimum values considered a "disturbance" in a year
+cots_dist <- 1 # cots per tow
+cyc_dist <- 10 # hours of 4m wave height
+dhw_dist <- 4  # degree heating weeks
+# Initialise a list of random points
+random_points <- data.frame(point_id = seq_len(num_samples),
+                            Location = integer(length = num_samples),
+                            Sector = rep(sector_boundaries$AREA_DESCR, 
+                                         each = reefs_per_mgmt))
+############################################
 
+########## SAMPLE REEF LOCATIONS ###########
+# Get random locations in each management area for sample reefs 
+for (row in 1:nrow(sector_boundaries)) {
+  from_row <- (row - 1)*reefs_per_mgmt + 1
+  to_row <- row*reefs_per_mgmt
+  random_points$Location[from_row:to_row] <- sector_boundaries$geometry[row] %>%
+    st_sample(size = reefs_per_mgmt, 
+              type = "random")
+}
+############################################
+
+########### GET NEAREST ENV OBS ############
 # Transform columns to rows, summarise cots at each Reef ID
 cots_data <- cots_data_raw %>%
   pivot_longer(cols = starts_with("COTS"),
@@ -122,7 +154,9 @@ dhw_data_sf$year <- as.numeric(dhw_data_sf$year)
 # Intersect cots data and aims data
 ## Returns list of distinct aims geometry points and index in unique 
 ## cots disturbance polygon dataset if within the bounds
-distinct_sample_geom <- distinct(df, geometry, .keep_all = TRUE)
+distinct_sample_geom <- distinct(random_points, Location, .keep_all = TRUE) %>%
+  st_as_sf(crs = st_crs(sector_boundaries))
+
 all_reefs_sf_cots <- st_intersects(distinct_sample_geom,  
                                    cots_sf_unique)
 
@@ -138,10 +172,14 @@ sample_sf_NA_index <- which(lengths(all_reefs_sf_cots) == 0)
 
 # Find nearest cots obs for NA aims geometry points
 ## Returns the index of the nearest neighbour in cots_sf_unique$geometry
-nearest_val <- st_nn(distinct_sample_geom$geometry[sample_sf_NA_index], 
+start_time <- Sys.time()
+nearest_val <- st_nn(distinct_sample_geom$Location[sample_sf_NA_index], 
                      cots_sf_unique$geometry,
                      k = 1,
-                     progress = FALSE) %>% suppressMessages()
+                     progress = FALSE,
+                     parallel = 12) %>% suppressMessages()
+end_time <- Sys.time()
+end_time - start_time
 
 # Put these nearest neighbours in all_reefs_sf_cots
 all_reefs_sf_cots[sample_sf_NA_index] <- nearest_val
@@ -157,10 +195,10 @@ geom_closest_dhw <- distinct_sample_geom %>%
   mutate(closest_index = all_reefs_sf_dhw)
 
 # Loop through each row in all_reefs_sf
-for (i in seq_len(nrow(df))) {
+for (i in seq_len(nrow(random_points))) {
   ## COTS ##
   # Get the index of the nearest neighbor in cots_sf_unique
-  nearest_index <- geom_closest_cots$closest_index[geom_closest_cots$point_id == df$point_id[i]] %>% 
+  nearest_index <- geom_closest_cots$closest_index[geom_closest_cots$point_id == random_points$point_id[i]] %>% 
     unlist()
   
   # Get the REEF_ID of the nearest neighbor
@@ -172,7 +210,7 @@ for (i in seq_len(nrow(df))) {
   
   ## WAVE HEIGHT / CYCLONES ##
   # Get the index of the nearest neighbor in cots_sf_unique
-  nearest_index <- geom_closest_cyc$closest_index[geom_closest_cyc$point_id == df$point_id[i]] %>% 
+  nearest_index <- geom_closest_cyc$closest_index[geom_closest_cyc$point_id == random_points$point_id[i]] %>% 
     unlist()
   
   # Get the REEF_ID of the nearest neighbor
@@ -184,7 +222,7 @@ for (i in seq_len(nrow(df))) {
   
   ## DEGREE HEATING WEEKS / HEATWAVES ##
   # Get the index of the nearest neighbor in cots_sf_unique
-  nearest_index <- geom_closest_dhw$closest_index[geom_closest_dhw$point_id == df$point_id[i]]%>% 
+  nearest_index <- geom_closest_dhw$closest_index[geom_closest_dhw$point_id == random_points$point_id[i]]%>% 
     unlist()
   
   # Get the REEF_ID of the nearest neighbor
@@ -207,3 +245,8 @@ for (i in seq_len(nrow(df))) {
                             dists$Hs4MW_value >= cyc_dist |
                             dists$annMaxDHW_value >= dhw_dist))
 }
+############################################
+
+################ SAVE DATA #################
+
+############################################
