@@ -15,6 +15,7 @@ cat("\014")
 ############################################
 
 ##### LOAD LIBRARIES FUNCTIONS & DATA ######
+start_time <- Sys.time()
 # Load Libraries
 library(sf)               # spatial feature handling
 library(lwgeom)           # spatial feature handling
@@ -31,6 +32,7 @@ library(ROI.plugin.glpk)  # GNU Linear Programming Kit
 library(ROI)              # R Optimization Infrastructure
 library(ggplot2)          # creates plots
 library(latex2exp)        # LaTeX for ggplot
+library(parallel)
 
 # Set the mphil path 
 mphil_path <- "../OneDrive - Queensland University of Technology/Documents/MPhil"
@@ -60,7 +62,8 @@ dhw_data_raw <- read.csv(paste0(data_path,
 ############################################
 
 ###### SET VARIABLES TO CHANGE ON RUN ######
-num_samples <- 1000
+num_samples <- 100000
+n_threads <- detectCores()
 reefs_per_mgmt <- num_samples/nrow(sector_boundaries)
 ############################################
 
@@ -172,14 +175,11 @@ sample_sf_NA_index <- which(lengths(all_reefs_sf_cots) == 0)
 
 # Find nearest cots obs for NA aims geometry points
 ## Returns the index of the nearest neighbour in cots_sf_unique$geometry
-start_time <- Sys.time()
 nearest_val <- st_nn(distinct_sample_geom$Location[sample_sf_NA_index], 
                      cots_sf_unique$geometry,
                      k = 1,
                      progress = FALSE,
-                     parallel = 12) %>% suppressMessages()
-end_time <- Sys.time()
-end_time - start_time
+                     parallel = n_threads) %>% suppressMessages()
 
 # Put these nearest neighbours in all_reefs_sf_cots
 all_reefs_sf_cots[sample_sf_NA_index] <- nearest_val
@@ -193,6 +193,15 @@ geom_closest_cyc <- distinct_sample_geom %>%
   mutate(closest_index = all_reefs_sf_cyc)
 geom_closest_dhw <- distinct_sample_geom %>% 
   mutate(closest_index = all_reefs_sf_dhw)
+
+# Initialise an empty data frame
+columns <- c("point_id", "point_loc", "REEF_ID",
+             "year", "COTS_value", "Hs4MW_value", 
+             "annMaxDHW_value", "isDisturbed")
+random_reefs_df <- matrix(nrow = 0, 
+                          ncol = length(columns)) %>%
+  data.frame()
+colnames(random_reefs_df) <- columns
 
 # Loop through each row in all_reefs_sf
 for (i in seq_len(nrow(random_points))) {
@@ -231,22 +240,32 @@ for (i in seq_len(nrow(random_points))) {
   # Find the corresponding rows in dhw_data_sf based on REEF_ID and year
   dhw_row <- dhw_data_sf %>%
     filter(REEF_ID == nearest_point_id)
-  
   dists <- cots_row %>%
     mutate(Hs4MW_value = cyc_row$Hs4MW_value,
-           annMaxDHW_value = dhw_row$annMaxDHW_value)
-  dists <- dists[dists$year < 2017 ,c("REEF_ID", "geometry", "year", 
-                                      "COTS_value", "Hs4MW_value", 
-                                      "annMaxDHW_value")]
-  
-  # Add column for whether there's a disturbance that year
+           annMaxDHW_value = dhw_row$annMaxDHW_value,
+           point_id = rep(i, nrow(cots_row)),
+           point_loc = rep(random_points$Location[i], 
+                           nrow(cots_row)))
   dists <- dists %>%
     mutate(isDisturbed = (dists$COTS_value >= cots_dist | 
                             dists$Hs4MW_value >= cyc_dist |
-                            dists$annMaxDHW_value >= dhw_dist))
+                            dists$annMaxDHW_value >= dhw_dist)) %>%
+    filter(year < 2017) %>%
+    as.data.frame() %>%
+    subset(select = columns)
+  
+  # Add to big data frame
+  from_row_num <- nrow(random_reefs_df) + 1
+  to_row_num <- nrow(random_reefs_df) + nrow(dists)
+  random_reefs_df[from_row_num:to_row_num,] <- dists
 }
+
 ############################################
 
 ################ SAVE DATA #################
-
+# Save to an rds file
+saveRDS(random_reefs_df, file = paste0(data_path,
+                                       "/random_reefs_df.rds"))
+end_time <- Sys.time()
+end_time - start_time
 ############################################
