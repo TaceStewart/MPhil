@@ -1,6 +1,6 @@
 sampler <- function(reef_df, sector_boundaries, num_samples, isTimeBased, 
                     recov_th, recov_yrs, cots_dist, cyc_dist, dhw_dist) {
-  # Define the number of hexagons
+  # Define the number of reefs per management area
   unique_mgmts <- unique(reef_df$sector)
   reefs_per_mgmt <- floor(num_samples / length(unique_mgmts))
   num_samples <- reefs_per_mgmt * length(unique_mgmts)
@@ -17,10 +17,6 @@ sampler <- function(reef_df, sector_boundaries, num_samples, isTimeBased,
       st_sample(size = reefs_per_mgmt, 
                 type = "random")
   }
-  
-  # Plot to see points on map
-  # plot(sector_boundaries$geometry)
-  # plot(random_points, col="red", add = TRUE)
   
   # Extract coordinates and create a data frame
   coordinates <- lapply(random_points, sf::st_coordinates)
@@ -68,14 +64,6 @@ sampler <- function(reef_df, sector_boundaries, num_samples, isTimeBased,
   # Find closest disturbance observations
   sample_reefs_df <- dist_finder(sample_reefs_df, isTimeBased, recov_th, 
                                  recov_yrs, cots_dist, cyc_dist, dhw_dist)
-  
-  #   sample_reefs_df$d_single[from_row:to_row] <- sample(reef_df$d_single[reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]], 
-  #                                                       reefs_per_mgmt, 
-  #                                                       replace = TRUE)
-  #   sample_reefs_df$d_comp[from_row:to_row] <- sample(reef_df$d_comp[reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]], 
-  #                                                     reefs_per_mgmt, 
-  #                                                     replace = TRUE)
-  # }
   
   return(sample_reefs_df)
 }
