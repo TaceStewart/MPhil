@@ -33,7 +33,7 @@ source('Stewart_MPhil_single_or_compound.R')
 source('Stewart_MPhil_ortiz_r_func.R')
 source('Stewart_MPhil_p_calc.R')
 source('Stewart_MPhil_Optimiser_Single.R')
-source('Stewart_MPhil_Optimiser_Compound.R')
+source('Stewart_MPhil_Optimiser_compound.R')
 source('Stewart_MPhil_Sampler.R')
 source('Stewart_MPhil_Dist_Finder.R')
 
@@ -117,25 +117,26 @@ all_reefs_sf <- all_reefs_sf %>%
   mutate(isDisturbed = (all_reefs_sf$COTS_value >= cots_dist | 
                           all_reefs_sf$Hs4MW_value >= cyc_dist |
                           all_reefs_sf$DHW_value >= dhw_dist),
+         isImpacted = 0,
          single_or_compound = NA,
          distType = NA,
-         ortizRecov = NA,
          recovYear = NA,
-         recovTime = NA)
+         recovTime = NA,
+         r_given_impact = NA)
 
 # Initialise df to save reef info in
 reef_df <- data.frame(reef.name = character(),
-                      num_single = integer(),
-                      d_single = double(),
-                      num_comp = integer(),
-                      d_comp = double(),
-                      r_ortiz_s = double(),
-                      r_ortiz_c = double(),
-                      r_single = double(),
-                      r_comp = double(),
                       latitude = double(),
                       longitude = double(),
                       sector = character(), 
+                      num_single = integer(),
+                      prob_s_dist = double(),
+                      prob_s_impact = double(),
+                      prob_s_recov = double(),
+                      num_comp = integer(),
+                      prob_c_dist = double(),
+                      prob_c_impact = double(),
+                      prob_c_recov = double(),
                       reef_unknown = integer())
 
 # Initialise dataframe of disturbance type and counts
@@ -156,7 +157,7 @@ event_counts <- data.frame(H = 0,
 
 ################# FOR LOOP #################
 # Run code for each reef
-# reef_name <- reef_names[1]
+# reef_name <- reef_names[3]
 for (reef_name in reef_names) {
   
   # Extract reef obs for named reef
@@ -179,65 +180,41 @@ for (reef_name in reef_names) {
                                       dhw_dist = dhw_dist)
   }
   
-  # Calculate Ortiz r for single and compound dists for reef
-  obs_by_reef <- ortiz_r_func(obs_by_reef, cots_dist = cots_dist,
-                              cyc_dist = cyc_dist, dhw_dist = dhw_dist)
-  
-  # Some recovery rates will be < 0 because of the threshold. 
-  # In these cases, let it be a low r instead
-  obs_by_reef$ortizRecov[obs_by_reef$ortizRecov < 0] <- 0.001
-  
   # Calculate number of years observed inclusive
   yrs_obsvd <- obs_by_reef$YEAR[nrow(obs_by_reef)] - obs_by_reef$YEAR[1] + 1
   
   # Calculate disturbance probabilities given occurrences
   # d = (number of events) / (years observed)
-  d_single <- ifelse(sum(obs_by_reef$single_or_compound == "Single", na.rm = TRUE) == 0,
-                     0,
-                     sum(obs_by_reef$single_or_compound == "Single", na.rm = TRUE)/yrs_obsvd)
-  d_comp <- ifelse(sum(obs_by_reef$single_or_compound == "Compound", na.rm = TRUE) == 0,
-                   0,
-                   sum(obs_by_reef$single_or_compound == "Compound", na.rm = TRUE)/yrs_obsvd)
-  
-  # Calculate average r for single and compound events, 
-  # r = 1/(ave years to recover)
-  single_dist <- obs_by_reef[obs_by_reef$single_or_compound == "Single",]
-  single_dist <- single_dist[!is.na(single_dist$recovYear),]
+  single_dist <- obs_by_reef %>%
+    filter(single_or_compound == "Single")
   num_single <- nrow(single_dist)
-  if (num_single > 0 & 
-      any(!is.na(single_dist$recovTime)) & 
-      (any(!grepl("Unknown", single_dist$ortizRecov)) |
-       any(!grepl("Unknown", single_dist$recovTime)))) {
-    single_dist <- single_dist[!grepl("Unknown", single_dist$ortizRecov),]
-    r_ortiz_s <- mean(as.numeric(single_dist$ortizRecov[check.numeric(single_dist$ortizRecov, na.rm = TRUE) &
-                                                          single_dist$single_or_compound == "Single"]), 
-                      na.rm = TRUE)
-    r_single <- 1/mean(as.numeric(single_dist$recovTime[check.numeric(single_dist$recovTime, na.rm = TRUE) &
-                                                          single_dist$single_or_compound == "Single"]), 
-                       na.rm = TRUE)
-  } else {
-    r_ortiz_s <- NA
-    r_single <- NA
-  }
-  comp_dist <- obs_by_reef[obs_by_reef$single_or_compound == "Compound",]
-  comp_dist <- comp_dist[!is.na(comp_dist$recovYear),]
+  prob_s_dist <- num_single/yrs_obsvd
+  # Prob Impacted given disturbance
+  # P(A|B) = P(A & B)/P(B)
+  prob_s_impact <- ifelse(num_single == 0,
+                          NA,
+                          sum(single_dist$isImpacted & single_dist$isDisturbed,
+                              na.rm = T)/
+                            sum(single_dist$isDisturbed,
+                                na.rm = T))
+  
+  prob_s_recov <- ifelse(any(!is.na(single_dist$r_given_impact)),
+                         mean(single_dist$r_given_impact, na.rm = T),
+                         NA)
+  comp_dist <- obs_by_reef %>%
+    filter(single_or_compound == "Compound")
   num_comp <- nrow(comp_dist)
-  if (num_single > 0 & 
-      any(!is.na(comp_dist$recovTime)) & 
-      (any(!grepl("Unknown", comp_dist$ortizRecov)) |
-       any(!grepl("Unknown", comp_dist$recovTime)))) {
-    comp_dist <- comp_dist[!grepl("Unknown", comp_dist$ortizRecov),]
-    r_ortiz_c <- mean(as.numeric(comp_dist$ortizRecov[check.numeric(comp_dist$ortizRecov, na.rm = TRUE) &
-                                                        comp_dist$single_or_compound == "Compound"]), 
-                      na.rm = TRUE)
-    r_comp <- 1/mean(as.numeric(comp_dist$recovTime[check.numeric(comp_dist$recovTime, na.rm = TRUE) &
-                                                      comp_dist$single_or_compound == "Compound"]), 
-                     na.rm = TRUE)
-  } else {
-    num_comp <- 0
-    r_ortiz_c <- NA
-    r_comp <- NA
-  }
+  prob_c_dist <- num_comp/yrs_obsvd
+  prob_c_impact <- ifelse(num_comp == 0,
+                          NA,
+                          sum(comp_dist$isImpacted & comp_dist$isDisturbed,
+                              na.rm = T)/
+                            sum(comp_dist$isDisturbed,
+                                na.rm = T))
+  
+  prob_c_recov <- ifelse(any(!is.na(comp_dist$r_given_impact)),
+                         mean(comp_dist$r_given_impact, na.rm = T),
+                         NA)
   
   # Get count of events for the reef and add to total event_counts df
   event_counts_rf <- c(H = sum(obs_by_reef$distType == "Heat Stress", na.rm = TRUE),
@@ -262,22 +239,22 @@ for (reef_name in reef_names) {
   
   ## Get latitude & longitude
   coordinates <- st_coordinates(obs_by_reef$geometry)
-  latitude <- coordinates[2]
-  longitude <- coordinates[1]
+  latitude <- coordinates[1,2]
+  longitude <- coordinates[1,1]
   
   ## Add all relevant information to data frame 
-  new_row <- c(reef_name,         # reef or reef & site name
-               num_single,        # no. of singular dists in obs period
-               d_single,          # probability of single cyclones per year
-               num_comp,          # no. of cumulative dists in obs period
-               d_comp,            # probability of compound cyclones per year
-               r_ortiz_s,         # ortiz recovery rate (single)
-               r_ortiz_c,         # ortiz recovery rate (compound)
-               r_single,          # recovery rate following single dist
-               r_comp,            # recovery rate following compound dist
-               latitude,          # latitude of reef/site
-               longitude,         # longitude of reef/site
+  new_row <- c(reef_name,                 # reef or reef & site name
+               latitude,                  # latitude of reef/site
+               longitude,                 # longitude of reef/site
                obs_by_reef$AREA_DESCR[1], # management region
+               num_single,                # no. of singular dists in obs period
+               prob_s_dist,               # probability of single disturbance per year
+               prob_s_impact,             # probability of impact given single disturbance
+               prob_s_recov,              # recovery rate following single dist impact
+               num_comp,                  # no. of cumulative dists in obs period
+               prob_c_dist,               # probability of compound disturbance per year
+               prob_c_impact,             # probability of impact given compound disturbance
+               prob_c_recov,              # recovery rate following compound dist impact
                reef_unknown)              # number of unknown recovery times
   reef_df[nrow(reef_df) + 1, ] <- new_row
   
@@ -289,86 +266,37 @@ for (reef_name in reef_names) {
 ########### HISTORICAL ANALYSIS ############
 # All single disturbances
 single_dists <- all_reefs_sf %>%
-  filter(single_or_compound == "Single" &
-           !grepl("Unknown", recovYear))
+  filter(single_or_compound == "Single")
 
-all_reefs_sf[all_reefs_sf$single_or_compound == "Single",]
-
-# Reefs with single disturbances
-single_reefs <- reef_df[!is.na(reef_df$r_single),] 
+# All reefs with single disturbances
+single_reefs <- reef_df %>%
+  filter(num_single > 0)
 
 # All compound disturbances
-compound_dists <- all_reefs_sf[all_reefs_sf$single_or_compound == "Compound" & 
-                                 check.numeric(all_reefs_sf$ortizRecov),]
-compound_dists <- compound_dists[!is.na(compound_dists$recovYear),] 
+compound_dists <- all_reefs_sf %>%
+  filter(single_or_compound == "Compound")
 
 # Reefs with compound disturbances
-compound_reefs <- reef_df[!is.na(reef_df$r_comp),] 
-
-# Ortiz growth rates following single and compound events
-single_dists$ortizRecov <- as.numeric(single_dists$ortizRecov)
-single_reefs$r_ortiz_s <- as.numeric(single_reefs$r_ortiz_s)
-compound_dists$ortizRecov <- as.numeric(compound_dists$ortizRecov)
-compound_reefs$r_ortiz_c <- as.numeric(compound_reefs$r_ortiz_c)
-#   Average ortiz r after all single disturbances 
-ortiz_s_dist_mean <- mean(single_dists$ortizRecov, na.rm = TRUE) 
-#   Average ortiz r (single) across reefs 
-ortiz_s_reef_mean <- mean(single_reefs$r_ortiz_s, na.rm = TRUE) 
-#   Average ortiz r after all compound disturbances 
-ortiz_c_dist_mean <- mean(compound_dists$ortizRecov, na.rm = TRUE) 
-#   Average ortiz r (compound) across reefs 
-ortiz_c_reef_mean <- mean(compound_reefs$r_ortiz_c, na.rm = TRUE) 
+compound_reefs <- reef_df %>%
+  filter(num_comp > 0)
 
 # Game growth rates following single and compound events
 single_dists$recovTime <- as.numeric(single_dists$recovTime)
-single_reefs$r_single <- as.numeric(single_reefs$r_single)
+single_reefs$prob_s_recov <- as.numeric(single_reefs$prob_s_recov)
 compound_dists$recovTime <- as.numeric(compound_dists$recovTime)
-compound_reefs$r_comp <- as.numeric(compound_reefs$r_comp)
+compound_reefs$prob_c_recov <- as.numeric(compound_reefs$prob_c_recov)
 #   Average game recovery time after all single disturbances 
 game_s_dist_mean <- 1/mean(single_dists$recovTime, na.rm = TRUE)
 #   Average game r (single) across reefs 
-game_s_reef_mean <- mean(single_reefs$r_single, na.rm = TRUE) 
+game_s_reef_mean <- mean(single_reefs$prob_s_recov, na.rm = TRUE) 
 #   Game confidence interval (95 %)
-game_s_reef_CI <- quantile(single_reefs$r_single, c(0.025, 0.975), na.rm = TRUE)
+game_s_reef_CI <- quantile(single_reefs$prob_s_recov, c(0.025, 0.975), na.rm = TRUE)
 #   Average game recovery time after all compound disturbances 
 game_c_dist_mean <- 1/mean(compound_dists$recovTime, na.rm = TRUE) 
 #   Average game r (compound) across reefs 
-game_c_reef_mean <- mean(compound_reefs$r_comp, na.rm = TRUE)
+game_c_reef_mean <- mean(compound_reefs$prob_c_recov, na.rm = TRUE)
 #   Game confidence interval (95 %)
-game_c_reef_CI <- quantile(compound_reefs$r_comp, c(0.025, 0.975), na.rm = TRUE)
-
-# Data frame to compare recovery following all disturbance events
-eventNames <- c("Wind Stress", "Heat Stress", "CoTS Outbreak",
-                "Wind Stress, Wind Stress", "Wind Stress, Heat Stress",
-                "Wind Stress, CoTS Outbreak", "Heat Stress, Wind Stress",
-                "Heat Stress, Heat Stress", "Heat Stress, CoTS Outbreak",
-                "CoTS Outbreak, Wind Stress", "CoTS Outbreak, Heat Stress", 
-                "CoTS Outbreak, CoTS Outbreak")
-recov_df <- data.frame(eventName = eventNames,
-                       distType = "",
-                       numDist = 0,
-                       ortiz_r = 0,
-                       r = 0)
-for (row in 1:nrow(recov_df)) {
-  recov_df$distType[row] <- ifelse(grepl(",", recov_df$eventName[row]), "Compound", "Single")
-  recov_df$numDist[row] <- ifelse(recov_df$distType[row] == "Single", 
-                                  sum(single_dists$distType == recov_df$eventName[row]),
-                                  sum(compound_dists$distType == recov_df$eventName[row]))
-  recov_df$ortiz_r[row] <- ifelse(recov_df$distType[row] == "Single",
-                                  mean(single_dists$ortizRecov[
-                                    single_dists$distType == recov_df$eventName[row]], 
-                                    na.rm = T),
-                                  mean(compound_dists$ortizRecov[
-                                    compound_dists$distType == recov_df$eventName[row]], 
-                                    na.rm = T))
-  recov_df$r[row] <- ifelse(recov_df$distType[row] == "Single",
-                            1/mean(single_dists$recovTime[
-                              single_dists$distType == recov_df$eventName[row]], 
-                              na.rm = T),
-                            1/mean(compound_dists$recovTime[
-                              compound_dists$distType == recov_df$eventName[row]], 
-                              na.rm = T))
-}
+game_c_reef_CI <- quantile(compound_reefs$prob_c_recov, c(0.025, 0.975), na.rm = TRUE)
 
 # Calculate probability of reef being in a recovered state
 reef_df <- p_calculator(reef_df, mgmt_benefit)
@@ -376,25 +304,33 @@ reef_df <- p_calculator(reef_df, mgmt_benefit)
 # Summarise d,r,p for single and compound dist in each sector
 sector_df <- data.frame(sector = unique(reef_df$sector),
                         num_single = NA,
+                        ave_prob_s_dist = NA,
+                        s_dist_ci_lwr = NA,
+                        s_dist_ci_upr = NA,
+                        ave_prob_s_impact= NA,
+                        s_impact_ci_lwr = NA,
+                        s_impact_ci_upr = NA,
+                        ave_prob_s_recov= NA,
+                        s_recov_ci_lwr = NA,
+                        s_recov_ci_upr = NA,
                         num_compound = NA,
-                        ave_d_s = NA,
-                        ave_d_c = NA,
+                        ave_prob_c_dist = NA,
+                        c_dist_ci_lwr = NA,
+                        c_dist_ci_upr = NA,
+                        ave_prob_c_impact= NA,
+                        c_impact_ci_lwr = NA,
+                        c_impact_ci_upr = NA,
+                        ave_prob_c_recov= NA,
+                        c_recov_ci_lwr = NA,
+                        c_recov_ci_upr = NA,
                         ave_r_s_unmgd = NA,
-                        ci_r_s_unmgd_lwr = NA,
-                        ci_r_s_unmgd_upr = NA,
-                        ave_r_s_mgd = NA,
-                        ci_r_s_mgd_lwr = NA,
-                        ci_r_s_mgd_upr = NA,
                         ave_r_c_unmgd = NA,
-                        ci_r_c_unmgd_lwr = NA,
-                        ci_r_c_unmgd_upr = NA,
-                        ave_r_c_mgd = NA,
-                        ci_r_c_mgd_lwr = NA,
-                        ci_r_c_mgd_upr = NA,
-                        pr_recov_sing_mgd = NA,
                         pr_recov_sing_unmgd = NA,
-                        pr_recov_comp_mgd = NA,
-                        pr_recov_comp_unmgd = NA)
+                        pr_recov_comp_unmgd = NA,
+                        ave_r_s_mgd = NA,
+                        ave_r_c_mgd = NA,
+                        pr_recov_sing_mgd = NA,
+                        pr_recov_comp_mgd = NA)
 # For each section,
 # sector <- unique(reef_df$sector)[1]
 for (sector in unique(reef_df$sector)) {
@@ -410,52 +346,90 @@ for (sector in unique(reef_df$sector)) {
                                              na.rm=TRUE)
   
   # Calculate probability of single disturbance
-  sector_df$ave_d_s[sec_df_indx] <- mean(as.numeric(reef_df$d_single[reef_df_indx]),
+  sector_df$ave_prob_s_dist[sec_df_indx] <- mean(as.numeric(reef_df$prob_s_dist[reef_df_indx]),
                                          na.rm=TRUE)
-  
-  # Calculate probability of compound disturbance
-  sector_df$ave_d_c[sec_df_indx] <- mean(as.numeric(reef_df$d_comp[reef_df_indx]),
-                                         na.rm=TRUE)
-  
-  # Calculate probability of recovery from single disturbance (unmanaged)
-  sector_df$ave_r_s_unmgd[sec_df_indx] <- mean(as.numeric(reef_df$r_single_unmgd[reef_df_indx]),
-                                               na.rm=TRUE)
   
   # Calculate confidence interval of recovery from single disturbance (unmanaged)
-  CI <- quantile(as.numeric(reef_df$r_single_unmgd[reef_df_indx]), c(0.025, 0.975), na.rm = TRUE)
-  sector_df$ci_r_s_unmgd_lwr[sec_df_indx] <- CI[1]
-  sector_df$ci_r_s_unmgd_upr[sec_df_indx] <- CI[2]
+  CI_s_dist <- quantile(as.numeric(reef_df$prob_s_dist[reef_df_indx]), 
+                 c(0.025, 0.975), 
+                 na.rm = TRUE)
+  sector_df$s_dist_ci_lwr[sec_df_indx] <- CI_s_dist[1]
+  sector_df$s_dist_ci_upr[sec_df_indx] <- CI_s_dist[2]
+  
+  # Calculate probability of compound disturbance
+  sector_df$ave_prob_c_dist[sec_df_indx] <- mean(as.numeric(reef_df$prob_c_dist[reef_df_indx]),
+                                         na.rm=TRUE)
+  
+  # Calculate confidence interval of recovery from single disturbance
+  CI_c_dist <- quantile(as.numeric(reef_df$prob_c_dist[reef_df_indx]), 
+                        c(0.025, 0.975), 
+                        na.rm = TRUE)
+  sector_df$c_dist_ci_lwr[sec_df_indx] <- CI_c_dist[1]
+  sector_df$c_dist_ci_upr[sec_df_indx] <- CI_c_dist[2]
+  
+  # Calculate probability of impact from single disturbance
+  sector_df$ave_prob_s_impact[sec_df_indx] <- mean(as.numeric(reef_df$prob_s_impact[reef_df_indx]),
+                                               na.rm=TRUE)
+  
+  # Calculate confidence interval of impact from single disturbance
+  CI_s_impact <- quantile(as.numeric(reef_df$prob_s_impact[reef_df_indx]), 
+                        c(0.025, 0.975), 
+                        na.rm = TRUE)
+  sector_df$s_impact_ci_lwr[sec_df_indx] <- CI_s_impact[1]
+  sector_df$s_impact_ci_upr[sec_df_indx] <- CI_s_impact[2]
+  
+  # Calculate probability of impact from compound disturbance
+  sector_df$ave_prob_c_impact[sec_df_indx] <- mean(as.numeric(reef_df$prob_c_impact[reef_df_indx]),
+                                                   na.rm=TRUE)
+  
+  # Calculate confidence interval of impact from compound disturbance
+  CI_c_impact <- quantile(as.numeric(reef_df$prob_c_impact[reef_df_indx]), 
+                          c(0.025, 0.975), 
+                          na.rm = TRUE)
+  sector_df$c_impact_ci_lwr[sec_df_indx] <- CI_c_impact[1]
+  sector_df$c_impact_ci_upr[sec_df_indx] <- CI_c_impact[2]
+  
+  # Calculate probability of recovery from single disturbance (unmanaged)
+  sector_df$ave_prob_s_recov[sec_df_indx] <- mean(as.numeric(reef_df$prob_s_recov[reef_df_indx]),
+                                               na.rm=TRUE)
+  
+  # Calculate confidence interval of recovery from single disturbance
+  CI_s_recov <- quantile(as.numeric(reef_df$prob_s_recov[reef_df_indx]), 
+                        c(0.025, 0.975), 
+                        na.rm = TRUE)
+  sector_df$s_recov_ci_lwr[sec_df_indx] <- CI_s_recov[1]
+  sector_df$s_recov_ci_upr[sec_df_indx] <- CI_s_recov[2]
+  
+  # Calculate probability of recovery from single disturbance (unmanaged)
+  sector_df$ave_prob_c_recov[sec_df_indx] <- mean(as.numeric(reef_df$prob_c_recov[reef_df_indx]),
+                                                  na.rm=TRUE)
+  
+  # Calculate confidence interval of recovery from single disturbance
+  CI_c_recov <- quantile(as.numeric(reef_df$prob_c_recov[reef_df_indx]), 
+                         c(0.025, 0.975), 
+                         na.rm = TRUE)
+  sector_df$c_recov_ci_lwr[sec_df_indx] <- CI_c_recov[1]
+  sector_df$c_recov_ci_upr[sec_df_indx] <- CI_c_recov[2]
   
   # Calculate probability of recovery from single disturbance (managed)
-  ave_r_s_mgd <- reef_df$r_single_mgd[reef_df_indx] %>%
+  ave_r_s_mgd <- reef_df$prob_s_recov[reef_df_indx] %>%
     as.numeric() * (1 + mgmt_benefit) %>%
     min(1) 
   sector_df$ave_r_s_mgd[sec_df_indx] <- mean(ave_r_s_mgd, na.rm=TRUE) 
   
-  # Calculate confidence interval of recovery from single disturbance (managed)
-  CI <- quantile(ave_r_s_mgd, c(0.025, 0.975), na.rm = TRUE)
-  sector_df$ci_r_s_mgd_lwr[sec_df_indx] <- CI[1]
-  sector_df$ci_r_s_mgd_upr[sec_df_indx] <- CI[2] 
-  
-  # Calculate probability of recovery from compound disturbance (unmanaged)
-  sector_df$ave_r_c_unmgd[sec_df_indx] <- mean(as.numeric(reef_df$r_comp[reef_df_indx]),
-                                               na.rm=TRUE)
-  
-  # Calculate confidence interval of recovery from compound disturbance (unmanaged)
-  CI <- quantile(as.numeric(reef_df$r_comp_unmgd[reef_df_indx]), c(0.025, 0.975), na.rm = TRUE)
-  sector_df$ci_r_c_unmgd_lwr[sec_df_indx] <- CI[1]
-  sector_df$ci_r_c_unmgd_upr[sec_df_indx] <- CI[2]
-  
   # Calculate probability of recovery from compound disturbance (managed)
-  ave_r_c_mgd <- reef_df$r_comp_mgd[reef_df_indx] %>%
+  ave_r_c_mgd <- reef_df$prob_c_recov[reef_df_indx] %>%
     as.numeric() * (1 + mgmt_benefit) %>%
     min(1) 
-  sector_df$ave_r_c_mgd[sec_df_indx] <- mean(ave_r_c_mgd, na.rm=TRUE)
+  sector_df$ave_r_c_mgd[sec_df_indx] <- mean(ave_r_c_mgd, na.rm=TRUE) 
   
-  # Calculate confidence interval of recovery from single disturbance (managed)
-  CI <- quantile(ave_r_c_mgd, c(0.025, 0.975), na.rm = TRUE)
-  sector_df$ci_r_c_mgd_lwr[sec_df_indx] <- CI[1]
-  sector_df$ci_r_c_mgd_upr[sec_df_indx] <- CI[2] # UP TO HERE
+  # Calculate probability of recovery from single disturbance (unmanaged)
+  sector_df$ave_r_s_unmgd[sec_df_indx] <- mean(as.numeric(reef_df$prob_s_recov[reef_df_indx]),
+                                               na.rm=TRUE)
+  
+  # Calculate probability of recovery from compound disturbance (unmanaged)
+  sector_df$ave_r_c_unmgd[sec_df_indx] <- mean(as.numeric(reef_df$prob_c_recov[reef_df_indx]),
+                                               na.rm=TRUE)
   
   # Calculate probability of recovery from single disturbance (unmanaged)
   sector_df$pr_recov_sing_unmgd[sec_df_indx] <- mean(as.numeric(reef_df$pr_recov_sing_unmgd[reef_df_indx]),
@@ -473,7 +447,6 @@ for (sector in unique(reef_df$sector)) {
   sector_df$pr_recov_comp_mgd[sec_df_indx] <- mean(as.numeric(reef_df$pr_recov_comp_mgd[reef_df_indx]),
                                                    na.rm=TRUE)
 }
-
 
 ############################################
 
@@ -549,7 +522,7 @@ if (isTimeBased) {
 
 # To Do:
 #   make raincloud vis for impact of compounding on prob recovered state
-
+#   Incorporate sample df
 ################# SAMPLING #################
 num_samples <- 100
 sample_reefs_df <- sampler(reef_df, sector_boundaries, num_samples, isTimeBased, 
@@ -591,9 +564,9 @@ if (n%%length(unique(reef_df$sector)) != 0) {
     length(unique(reef_df$sector))
 }
 
-column_names <- c('geometry', 'point_id', 'd_single', 'd_comp', 'r_single',
-                  'r_comp', 'r_single_unmgd', 'r_single_mgd', 'r_comp_unmgd',
-                  'r_comp_mgd', 'pr_recov_sing_unmgd', 'pr_recov_sing_mgd',
+column_names <- c('geometry', 'point_id', 'prob_s_dist', 'prob_c_dist', 'prob_s_recov',
+                  'prob_c_recov', 'prob_s_recov_unmgd', 'prob_s_recov_mgd', 'prob_c_recov_unmgd',
+                  'prob_c_recov_mgd', 'pr_recov_sing_unmgd', 'pr_recov_sing_mgd',
                   'pr_recov_comp_unmgd', 'pr_recov_comp_mgd')
 
 # Initialise:
@@ -601,8 +574,8 @@ all_samples <- matrix(NA, nrow = n*n_sims, ncol = length(column_names)) %>%
   data.frame()                    # df for all sample reef info
 colnames(all_samples) <- column_names
 all_samples <- all_samples %>% 
-  mutate(isManaged_Single = NA,   # column in df for managed/not (single)
-         isManaged_Compound = NA) # column for managed/not (compound)
+  mutate(isManageprob_s_dist = NA,   # column in df for managed/not (single)
+         isManageprob_c_distound = NA) # column for managed/not (compound)
 
 # For each simulation,
 for (sim in 1:n_sims) {
@@ -616,9 +589,9 @@ for (sim in 1:n_sims) {
   from_row <- (sim - 1)*n + 1
   to_row <- sim*n
   all_samples[from_row:to_row, 1:length(column_names)] <- sample_reefs_df %>% 
-    subset(select = c(geometry, point_id, d_single, d_comp, r_single, 
-                      r_comp, r_single_unmgd, r_single_mgd, r_comp_unmgd, 
-                      r_comp_mgd, pr_recov_sing_unmgd, pr_recov_sing_mgd, 
+    subset(select = c(geometry, point_id, prob_s_dist, prob_c_dist, prob_s_recov, 
+                      prob_c_recov, prob_s_recov_unmgd, prob_s_recov_mgd, prob_c_recov_unmgd, 
+                      prob_c_recov_mgd, pr_recov_sing_unmgd, pr_recov_sing_mgd, 
                       pr_recov_comp_unmgd, pr_recov_comp_mgd))
   
   # Calculate single disturbance solution
@@ -631,13 +604,13 @@ for (sim in 1:n_sims) {
   sol_s <- get_solution(sing_result, y[i])$value
   sol_c <- get_solution(comp_result, y[i])$value
   
-  all_samples[from_row:to_row, 'isManaged_Single'] <- sol_s
-  all_samples[from_row:to_row, 'isManaged_Compound'] <- sol_c
+  all_samples[from_row:to_row, 'isManageprob_s_dist'] <- sol_s
+  all_samples[from_row:to_row, 'isManageprob_c_distound'] <- sol_c
 }
 
 # Visualise the reefs to manage
 all_samples <- st_as_sf(all_samples, crs = st_crs(sector_boundaries))
-single_vals <- st_transform(all_samples[all_samples$isManaged_Single == 1,], 
+single_vals <- st_transform(all_samples[all_samples$isManageprob_s_dist == 1,], 
                             crs = st_crs(sector_boundaries))
 
 x_single <- st_coordinates(single_vals$geometry)[,1]
@@ -654,7 +627,7 @@ single_plot <- ggplot() +
            binwidth = c(0.5,0.5)) +
   theme(plot.tag = element_text())
 
-compound_vals <- st_transform(all_samples[all_samples$isManaged_Compound == 1,], 
+compound_vals <- st_transform(all_samples[all_samples$isManageprob_c_distound == 1,], 
                               crs = st_crs(sector_boundaries))
 
 x_compound <- st_coordinates(compound_vals$geometry)[,1]
