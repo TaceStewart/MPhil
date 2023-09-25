@@ -5,7 +5,7 @@
 # Definition of compound if isTimeBased is TRUE: A disturbance occurs within 
 # <recov_yrs> of a previous disturbance
 single_or_compound <- function(obs_by_reef, isTimeBased, recov_th, recov_yrs,
-                               cots_dist, cyc_dist, dhw_dist) {
+                               cots_dist, cyc_dist, dhw_dist, inferBaseline = 0) {
   # Value for % below baseline that reef is impacted by disturbance
   epsilon <- 0.05 #5%
   
@@ -31,18 +31,25 @@ single_or_compound <- function(obs_by_reef, isTimeBased, recov_th, recov_yrs,
       if(obs_by_reef$COVER[distIndices[1]] < maxPreDistCover*(1 - epsilon)) {
         # Then we have a reef with a baseline
         baseline <- maxPreDistCover*(1 - epsilon)
-        
-        # Initialise skip variable
-        skipNext <- 0
-        
+      } else if (inferBaseline) { 
+        # Then we can make a baseline from any maxima around the global maximum - epsilon
+        baseline <- mean(obs_by_reef$COVER >= max(obs_by_reef$COVER)*(1-epsilon))
+      } else {
+        # Then this reef does not have a baseline
+        baseline <- NA
+      }
+      
+      # Initialise skip variable
+      skipNext <- 0
+      if (!is.na(baseline)) {
         # For each disturbance
         # distIndex <- distIndices[1] # for testing
         for (distIndex in distIndices) {
           # Check if there's a new baseline
-           if(max(obs_by_reef$COVER[1:distIndex - 1]) > maxPreDistCover) {
-             maxPreDistCover <- max(obs_by_reef$COVER[1:distIndex - 1])
-             baseline <- maxPreDistCover*(1 - epsilon)
-           }
+          if(max(obs_by_reef$COVER[1:distIndex - 1]) > maxPreDistCover) {
+            maxPreDistCover <- max(obs_by_reef$COVER[1:distIndex - 1])
+            baseline <- maxPreDistCover*(1 - epsilon)
+          }
           
           # If we need to skip this disturbance as it was already counted in the last one
           if (skipNext > 0) {
@@ -59,7 +66,7 @@ single_or_compound <- function(obs_by_reef, isTimeBased, recov_th, recov_yrs,
               # If there are any disturbances between this one and recov_yrs from now
               currentYr <- obs_by_reef$YEAR[distIndex]
               if (any(obs_by_reef$isDisturbed[obs_by_reef$YEAR > currentYr &
-                                              obs_by_reef$YEAR < currentYr + recov_yrs])) {
+                                              obs_by_reef$YEAR < currentYr + recov_yrs])) {   
                 # Get a list of those disturbance index/es
                 nextDist_s <- which(obs_by_reef$isDisturbed[obs_by_reef$YEAR > currentYr &
                                                               obs_by_reef$YEAR < currentYr + recov_yrs]) + distIndex
@@ -157,12 +164,9 @@ single_or_compound <- function(obs_by_reef, isTimeBased, recov_th, recov_yrs,
             } 
           }
         } 
-      } else {
-        # Then this reef does not have a baseline
       }
     }
-  } 
-  
+  }  
   # List of indices of disturbances with recovYr so we don't loop through all rows
   distIndices <- which(!is.na(obs_by_reef$recovYear) & 
                          (!grepl("Unknown", obs_by_reef$recovYear)))

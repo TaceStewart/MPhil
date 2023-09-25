@@ -60,6 +60,9 @@ sector_boundaries <- st_read(shapefile_path,
 ############################################
 
 ###### SET VARIABLES TO CHANGE ON RUN ######
+# Should the baseline be inferred if non-existent at start of obs period?
+inferBaseline <- 1
+
 # Time based or recovery based compounding?
 #  Note: Set to TRUE for time-based compounding or FALSE for recovery-based
 isTimeBased <- FALSE
@@ -170,14 +173,16 @@ for (reef_name in reef_names) {
                                       recov_yrs = recov_yrs,
                                       cots_dist = cots_dist,
                                       cyc_dist = cyc_dist,
-                                      dhw_dist = dhw_dist)
+                                      dhw_dist = dhw_dist,
+                                      inferBaseline = inferBaseline)
   } else {
     obs_by_reef <- single_or_compound(obs_by_reef = obs_by_reef, 
                                       isTimeBased = isTimeBased,
                                       recov_th = recov_th,
                                       cots_dist = cots_dist,
                                       cyc_dist = cyc_dist,
-                                      dhw_dist = dhw_dist)
+                                      dhw_dist = dhw_dist,
+                                      inferBaseline = inferBaseline)
   }
   
   # Calculate number of years observed inclusive
@@ -520,307 +525,307 @@ if (isTimeBased) {
 }
 ############################################
 
-# To Do:
-#   make raincloud vis for impact of compounding on prob recovered state
-#   Incorporate sample df
-################# SAMPLING #################
-num_samples <- 100
-sample_reefs_df <- sampler(reef_df, sector_boundaries, num_samples, isTimeBased, 
-                           recov_th, recov_yrs, cots_dist, cyc_dist, dhw_dist) %>%
-  suppressMessages()
-
-############################################
-
-########### SAMPLE OPTIMISATION ############
-
-sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit)
-
-sing_result <- optimiserSingle(sample_reefs_df, mgmt_constraint)   # Single disturbance solution
-comp_result <- optimiserCompound(sample_reefs_df, mgmt_constraint) # Compound disturbance solution
-
-# PRINT RESULTS
-reef_s_to_manage_s <- which(get_solution(sing_result, y[i])$value == 1)
-prcvd_exp_recov_s <- sum(sample_reefs_df$pr_recov_sing_mgd[reef_s_to_manage_s]) + 
-  sum(sample_reefs_df$pr_recov_sing_unmgd[-c(reef_s_to_manage_s)])           # Perceived reefs in recov state
-actual_exp_recov_s <- sum(sample_reefs_df$pr_recov_comp_mgd[reef_s_to_manage_s]) + 
-  sum(sample_reefs_df$pr_recov_comp_unmgd[-c(reef_s_to_manage_s)])           # Actual reefs in recov state
-reef_s_to_manage_c <- which(get_solution(comp_result, y[i])$value == 1)
-exp_recov_c <- sum(sample_reefs_df$pr_recov_comp_mgd[reef_s_to_manage_c]) + 
-  sum(sample_reefs_df$pr_recov_comp_unmgd[-c(reef_s_to_manage_c)])           # Expected reefs in recov state
-print(paste("When only considering single disturbances, it is recommended to manage reef/s",
-            paste(reef_s_to_manage_s, collapse = ", "), "for a perceived", 
-            prcvd_exp_recov_s, "reefs in a recovered state, but an actual", 
-            actual_exp_recov_s, "reefs in a recovered state.", 
-            "In the compound disturbance scenario, it is recommended to manage reef/s", 
-            paste(reef_s_to_manage_c, collapse = ", "), "for an expected", 
-            exp_recov_c, "reefs in a recovered state."))
-############################################
-
-############### SIMULATIONS ################
-
-# Number of reefs must be divisible by number of sections in reef_df
-if (n%%length(unique(reef_df$sector)) != 0) {
-  n <- floor(n/length(unique(reef_df$sector)))*
-    length(unique(reef_df$sector))
-}
-
-column_names <- c('geometry', 'point_id', 'prob_s_dist', 'prob_c_dist', 'prob_s_recov',
-                  'prob_c_recov', 'prob_s_recov_unmgd', 'prob_s_recov_mgd', 'prob_c_recov_unmgd',
-                  'prob_c_recov_mgd', 'pr_recov_sing_unmgd', 'pr_recov_sing_mgd',
-                  'pr_recov_comp_unmgd', 'pr_recov_comp_mgd')
-
-# Initialise:
-all_samples <- matrix(NA, nrow = n*n_sims, ncol = length(column_names)) %>%
-  data.frame()                    # df for all sample reef info
-colnames(all_samples) <- column_names
-all_samples <- all_samples %>% 
-  mutate(isManageprob_s_dist = NA,   # column in df for managed/not (single)
-         isManageprob_c_distound = NA) # column for managed/not (compound)
-
-# For each simulation,
-for (sim in 1:n_sims) {
-  # Sample n reefs from reef_df
-  sample_reefs_df <- sampler(reef_df, sector_boundaries, n, isTimeBased, 
-                             recov_th, recov_yrs, cots_dist, cyc_dist, dhw_dist)
-  
-  # Calculate p for the n reefs
-  sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit)
-  
-  from_row <- (sim - 1)*n + 1
-  to_row <- sim*n
-  all_samples[from_row:to_row, 1:length(column_names)] <- sample_reefs_df %>% 
-    subset(select = c(geometry, point_id, prob_s_dist, prob_c_dist, prob_s_recov, 
-                      prob_c_recov, prob_s_recov_unmgd, prob_s_recov_mgd, prob_c_recov_unmgd, 
-                      prob_c_recov_mgd, pr_recov_sing_unmgd, pr_recov_sing_mgd, 
-                      pr_recov_comp_unmgd, pr_recov_comp_mgd))
-  
-  # Calculate single disturbance solution
-  sing_result <- optimiserSingle(sample_reefs_df, mgmt_constraint)   
-  
-  # Calculate compound disturbance solution
-  comp_result <- optimiserCompound(sample_reefs_df, mgmt_constraint) 
-  
-  # Get the reefs to manage from solution
-  sol_s <- get_solution(sing_result, y[i])$value
-  sol_c <- get_solution(comp_result, y[i])$value
-  
-  all_samples[from_row:to_row, 'isManageprob_s_dist'] <- sol_s
-  all_samples[from_row:to_row, 'isManageprob_c_distound'] <- sol_c
-}
-
-# Visualise the reefs to manage
-all_samples <- st_as_sf(all_samples, crs = st_crs(sector_boundaries))
-single_vals <- st_transform(all_samples[all_samples$isManageprob_s_dist == 1,], 
-                            crs = st_crs(sector_boundaries))
-
-x_single <- st_coordinates(single_vals$geometry)[,1]
-y_single <- st_coordinates(single_vals$geometry)[,2]
-
-single_plot <- ggplot() +
-  geom_sf(data = sector_boundaries, lwd = 0.01) +
-  theme_classic() +
-  labs(x = "Longitude",
-       y = "Latitude",
-       tag = "A") +
-  geom_hex(single_vals, 
-           mapping = aes(x_single, y_single),
-           binwidth = c(0.5,0.5)) +
-  theme(plot.tag = element_text())
-
-compound_vals <- st_transform(all_samples[all_samples$isManageprob_c_distound == 1,], 
-                              crs = st_crs(sector_boundaries))
-
-x_compound <- st_coordinates(compound_vals$geometry)[,1]
-y_compound <- st_coordinates(compound_vals$geometry)[,2]
-
-compound_plot <- ggplot() +
-  geom_sf(data = sector_boundaries, lwd = 0.01) +
-  theme_classic() +
-  labs(x = "Longitude",
-       y = "Latitude",
-       tag = "B") +
-  geom_hex(compound_vals, 
-           mapping = aes(x_compound, y_compound),
-           binwidth = c(0.5,0.5)) + 
-  theme(plot.tag = element_text())
-compound_plot
-
-p <- ggplot_build(single_plot)$data[[2]]
-q <- ggplot_build(compound_plot)$data[[2]]
-
-single_plot <- ggplot() +
-  geom_sf(data = sector_boundaries, lwd = 0.01) +
-  theme_classic() +
-  labs(x = "Longitude",
-       y = "Latitude",
-       tag = "A") +
-  theme(plot.tag = element_text()) +
-  geom_hex(single_vals, 
-           mapping = aes(x_single, y_single),
-           binwidth = c(0.5,0.5)) +
-  scale_fill_continuous(limits = c(min(p$count, q$count), 
-                                   max(p$count, q$count))) +
-  labs(fill = "Number of \nManaged Reefs")
-
-compound_plot <- ggplot() +
-  geom_sf(data = sector_boundaries, lwd = 0.01) +
-  theme_classic() +
-  labs(x = "Longitude",
-       y = "Latitude",
-       tag = "B") +
-  geom_hex(compound_vals, 
-           mapping = aes(x_compound, y_compound),
-           binwidth = c(0.5,0.5)) + 
-  scale_fill_continuous(limits = c(min(p$count, q$count), 
-                                   max(p$count, q$count))) +
-  theme(plot.tag = element_text())
-
-ggarrange(single_plot, compound_plot, 
-          ncol=2, nrow=1, 
-          common.legend = TRUE, 
-          legend="right")
-
-if (isTimeBased) {
-  ggsave(paste0(out_path, "/", 
-                n_sims, "Sim_Hexmap_TimeBased", 
-                recov_yrs, "yr", mgmt_benefit, "mgmt.png"), 
-         plot = last_plot(), 
-         width=8, height=5)
-} else {
-  ggsave(paste0(out_path, "/", 
-                n_sims, "Sim_Hexmap_RecovBased", 
-                recov_th, "th", mgmt_benefit, "mgmt.png"), 
-         plot = last_plot(), 
-         width=8, height=5)
-}
-
-
-############################################
-
-############# SAVE ENVIRONMENT #############
-if (isTimeBased) {
-  save.image(paste0(data_path,
-                    "/Parameter Run Environments/", 
-                    "TimeBased", recov_yrs, "yrs", 
-                    mgmt_benefit, "mgmt.RData"))
-} else {
-  save.image(paste0(data_path,
-                    "/Parameter Run Environments/", 
-                    "RecovBased", recov_th, "th", 
-                    mgmt_benefit, "mgmt.RData"))
-}
-############################################
-
-############ LIBRARY GRAVEYARD #############
-# library(ncdf4)            # opens ".nc" files
-# library(colorspace)       # makes colouring plots easier
-# library(lubridate)        # manipulates date/time easily
-# library(tidyverse)        # pipes
-# library(stringr)          # handles strings
-# library(lpSolve)          # linear programming model solver
-# library(leaflet)
-# library(maps)
-# library(raster)
-# library(ggspatial)
-# library(dataaimsr)
-# library(gisaimsr)
-# library(ggrepel)
-# library(leaflet.providers)
-############################################
-
-############# CODE GRAVEYARD ###############
-
-############################################
-
-############### VIS GRAVEYARD ##############
-
-# SAMPLE OPT VIS
-# Plot the sectors with different colours
-# sector_boundaries$AREA_DESCR <- factor(sector_boundaries$AREA_DESCR, 
-#                                        levels = gbr_name_order[4:1])
+# # To Do:
+# #   make raincloud vis for impact of compounding on prob recovered state
+# #   Incorporate sample df
+# ################# SAMPLING #################
+# num_samples <- 100
+# sample_reefs_df <- sampler(reef_df, sector_boundaries, num_samples, isTimeBased, 
+#                            recov_th, recov_yrs, cots_dist, cyc_dist, dhw_dist) %>%
+#   suppressMessages()
 # 
-# sample_reefs_df <- st_as_sf(sample_reefs_df, crs = st_crs(sector_boundaries))
+# ############################################
 # 
-# sample_reefs_df$x <- st_coordinates(sample_reefs_df$geometry)[,1]
-# sample_reefs_df$y <- st_coordinates(sample_reefs_df$geometry)[,2]
+# ########### SAMPLE OPTIMISATION ############
 # 
-# sector_boundaries_fill <- sector_boundaries %>% 
-#   mutate(single_count = nrow(sample_reefs_df[sample_reefs_df$AREA_DESCR[reef_s_to_manage_s] == 
-#                                                AREA_DESCR,]), 
-#          compound_count = nrow(sample_reefs_df[sample_reefs_df$AREA_DESCR[reef_s_to_manage_c] == 
-#                                                  AREA_DESCR,]))
-# for (sector in sector_boundaries_fill$AREA_DESCR) {
-#   sector_boundaries_fill$single_count[sector_boundaries_fill$AREA_DESCR == sector] = 
-#     sum(sample_reefs_df$AREA_DESCR[reef_s_to_manage_s] == sector)
-#   sector_boundaries_fill$compound_count[sector_boundaries_fill$AREA_DESCR == sector] = 
-#     sum(sample_reefs_df$AREA_DESCR[reef_s_to_manage_c] == sector)
+# sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit)
+# 
+# sing_result <- optimiserSingle(sample_reefs_df, mgmt_constraint)   # Single disturbance solution
+# comp_result <- optimiserCompound(sample_reefs_df, mgmt_constraint) # Compound disturbance solution
+# 
+# # PRINT RESULTS
+# reef_s_to_manage_s <- which(get_solution(sing_result, y[i])$value == 1)
+# prcvd_exp_recov_s <- sum(sample_reefs_df$pr_recov_sing_mgd[reef_s_to_manage_s]) + 
+#   sum(sample_reefs_df$pr_recov_sing_unmgd[-c(reef_s_to_manage_s)])           # Perceived reefs in recov state
+# actual_exp_recov_s <- sum(sample_reefs_df$pr_recov_comp_mgd[reef_s_to_manage_s]) + 
+#   sum(sample_reefs_df$pr_recov_comp_unmgd[-c(reef_s_to_manage_s)])           # Actual reefs in recov state
+# reef_s_to_manage_c <- which(get_solution(comp_result, y[i])$value == 1)
+# exp_recov_c <- sum(sample_reefs_df$pr_recov_comp_mgd[reef_s_to_manage_c]) + 
+#   sum(sample_reefs_df$pr_recov_comp_unmgd[-c(reef_s_to_manage_c)])           # Expected reefs in recov state
+# print(paste("When only considering single disturbances, it is recommended to manage reef/s",
+#             paste(reef_s_to_manage_s, collapse = ", "), "for a perceived", 
+#             prcvd_exp_recov_s, "reefs in a recovered state, but an actual", 
+#             actual_exp_recov_s, "reefs in a recovered state.", 
+#             "In the compound disturbance scenario, it is recommended to manage reef/s", 
+#             paste(reef_s_to_manage_c, collapse = ", "), "for an expected", 
+#             exp_recov_c, "reefs in a recovered state."))
+# ############################################
+# 
+# ############### SIMULATIONS ################
+# 
+# # Number of reefs must be divisible by number of sections in reef_df
+# if (n%%length(unique(reef_df$sector)) != 0) {
+#   n <- floor(n/length(unique(reef_df$sector)))*
+#     length(unique(reef_df$sector))
 # }
 # 
-# single_p <- ggplot() +
-#   geom_sf(data = sector_boundaries_fill,
-#           mapping = aes(fill = single_count), lwd = 0.01) +
+# column_names <- c('geometry', 'point_id', 'prob_s_dist', 'prob_c_dist', 'prob_s_recov',
+#                   'prob_c_recov', 'prob_s_recov_unmgd', 'prob_s_recov_mgd', 'prob_c_recov_unmgd',
+#                   'prob_c_recov_mgd', 'pr_recov_sing_unmgd', 'pr_recov_sing_mgd',
+#                   'pr_recov_comp_unmgd', 'pr_recov_comp_mgd')
+# 
+# # Initialise:
+# all_samples <- matrix(NA, nrow = n*n_sims, ncol = length(column_names)) %>%
+#   data.frame()                    # df for all sample reef info
+# colnames(all_samples) <- column_names
+# all_samples <- all_samples %>% 
+#   mutate(isManageprob_s_dist = NA,   # column in df for managed/not (single)
+#          isManageprob_c_distound = NA) # column for managed/not (compound)
+# 
+# # For each simulation,
+# for (sim in 1:n_sims) {
+#   # Sample n reefs from reef_df
+#   sample_reefs_df <- sampler(reef_df, sector_boundaries, n, isTimeBased, 
+#                              recov_th, recov_yrs, cots_dist, cyc_dist, dhw_dist)
+#   
+#   # Calculate p for the n reefs
+#   sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit)
+#   
+#   from_row <- (sim - 1)*n + 1
+#   to_row <- sim*n
+#   all_samples[from_row:to_row, 1:length(column_names)] <- sample_reefs_df %>% 
+#     subset(select = c(geometry, point_id, prob_s_dist, prob_c_dist, prob_s_recov, 
+#                       prob_c_recov, prob_s_recov_unmgd, prob_s_recov_mgd, prob_c_recov_unmgd, 
+#                       prob_c_recov_mgd, pr_recov_sing_unmgd, pr_recov_sing_mgd, 
+#                       pr_recov_comp_unmgd, pr_recov_comp_mgd))
+#   
+#   # Calculate single disturbance solution
+#   sing_result <- optimiserSingle(sample_reefs_df, mgmt_constraint)   
+#   
+#   # Calculate compound disturbance solution
+#   comp_result <- optimiserCompound(sample_reefs_df, mgmt_constraint) 
+#   
+#   # Get the reefs to manage from solution
+#   sol_s <- get_solution(sing_result, y[i])$value
+#   sol_c <- get_solution(comp_result, y[i])$value
+#   
+#   all_samples[from_row:to_row, 'isManageprob_s_dist'] <- sol_s
+#   all_samples[from_row:to_row, 'isManageprob_c_distound'] <- sol_c
+# }
+# 
+# # Visualise the reefs to manage
+# all_samples <- st_as_sf(all_samples, crs = st_crs(sector_boundaries))
+# single_vals <- st_transform(all_samples[all_samples$isManageprob_s_dist == 1,], 
+#                             crs = st_crs(sector_boundaries))
+# 
+# x_single <- st_coordinates(single_vals$geometry)[,1]
+# y_single <- st_coordinates(single_vals$geometry)[,2]
+# 
+# single_plot <- ggplot() +
+#   geom_sf(data = sector_boundaries, lwd = 0.01) +
 #   theme_classic() +
 #   labs(x = "Longitude",
 #        y = "Latitude",
 #        tag = "A") +
-#   scale_fill_continuous(limits = c(min(sector_boundaries_fill$single_count, 
-#                                        sector_boundaries_fill$compound_count), 
-#                                    max(sector_boundaries_fill$single_count, 
-#                                        sector_boundaries_fill$compound_count))) +
-#   labs(fill = "Number of \nManaged Reefs") +
-#   theme(plot.tag = element_text()) + 
-#   annotate("text", x = 145, y = -24, 
-#            label = TeX(paste0("$E\\[R_{1}\\] = ", floor(actual_exp_recov_s), "$")),
-#            parse = TRUE) %>%
-#   suppressMessages()
+#   geom_hex(single_vals, 
+#            mapping = aes(x_single, y_single),
+#            binwidth = c(0.5,0.5)) +
+#   theme(plot.tag = element_text())
 # 
-# compound_p <- ggplot() +
-#   geom_sf(data = sector_boundaries_fill,
-#           mapping = aes(fill = compound_count), lwd = 0.01) +
+# compound_vals <- st_transform(all_samples[all_samples$isManageprob_c_distound == 1,], 
+#                               crs = st_crs(sector_boundaries))
+# 
+# x_compound <- st_coordinates(compound_vals$geometry)[,1]
+# y_compound <- st_coordinates(compound_vals$geometry)[,2]
+# 
+# compound_plot <- ggplot() +
+#   geom_sf(data = sector_boundaries, lwd = 0.01) +
 #   theme_classic() +
 #   labs(x = "Longitude",
 #        y = "Latitude",
 #        tag = "B") +
-#   scale_fill_continuous(limits = c(min(sector_boundaries_fill$single_count, 
-#                                        sector_boundaries_fill$compound_count), 
-#                                    max(sector_boundaries_fill$single_count, 
-#                                        sector_boundaries_fill$compound_count))) +
-#   theme(plot.tag = element_text()) +
-#   annotate("text", x = 145, y = -24, 
-#            label = TeX(paste0("$E\\[R_{2}\\] = ", floor(exp_recov_c), "$")),
-#            parse = TRUE) %>%
-#   suppressMessages()
+#   geom_hex(compound_vals, 
+#            mapping = aes(x_compound, y_compound),
+#            binwidth = c(0.5,0.5)) + 
+#   theme(plot.tag = element_text())
+# compound_plot
 # 
-# ggarrange(single_p, compound_p, 
+# p <- ggplot_build(single_plot)$data[[2]]
+# q <- ggplot_build(compound_plot)$data[[2]]
+# 
+# single_plot <- ggplot() +
+#   geom_sf(data = sector_boundaries, lwd = 0.01) +
+#   theme_classic() +
+#   labs(x = "Longitude",
+#        y = "Latitude",
+#        tag = "A") +
+#   theme(plot.tag = element_text()) +
+#   geom_hex(single_vals, 
+#            mapping = aes(x_single, y_single),
+#            binwidth = c(0.5,0.5)) +
+#   scale_fill_continuous(limits = c(min(p$count, q$count), 
+#                                    max(p$count, q$count))) +
+#   labs(fill = "Number of \nManaged Reefs")
+# 
+# compound_plot <- ggplot() +
+#   geom_sf(data = sector_boundaries, lwd = 0.01) +
+#   theme_classic() +
+#   labs(x = "Longitude",
+#        y = "Latitude",
+#        tag = "B") +
+#   geom_hex(compound_vals, 
+#            mapping = aes(x_compound, y_compound),
+#            binwidth = c(0.5,0.5)) + 
+#   scale_fill_continuous(limits = c(min(p$count, q$count), 
+#                                    max(p$count, q$count))) +
+#   theme(plot.tag = element_text())
+# 
+# ggarrange(single_plot, compound_plot, 
 #           ncol=2, nrow=1, 
 #           common.legend = TRUE, 
-#           legend="right") %>%
-#   suppressMessages()
+#           legend="right")
 # 
 # if (isTimeBased) {
-#   ggsave(paste0("../MPhil Thesis/", 
-#                 num_samples, "Sample_Choropleth_TimeBased", 
+#   ggsave(paste0(out_path, "/", 
+#                 n_sims, "Sim_Hexmap_TimeBased", 
 #                 recov_yrs, "yr", mgmt_benefit, "mgmt.png"), 
 #          plot = last_plot(), 
 #          width=8, height=5)
 # } else {
-#   ggsave(paste0("../MPhil Thesis/", 
-#                 num_samples, "Sample_Choropleth_RecovBased", 
+#   ggsave(paste0(out_path, "/", 
+#                 n_sims, "Sim_Hexmap_RecovBased", 
 #                 recov_th, "th", mgmt_benefit, "mgmt.png"), 
 #          plot = last_plot(), 
 #          width=8, height=5)
 # }
-
-# # Locations of (real) reefs in system
-# ggplot() +
-#   geom_sf(data = sector_boundaries,
-#           mapping = aes(fill = AREA_DESCR), lwd = 0.01) +
-#   theme_classic() +
-#   labs(x = "Longitude",
-#        y = "Latitude") +
-#   scale_fill_brewer(name = "Region", palette = "Spectral") +
-#   geom_sf(data = all_reefs_sf$geometry,
-#           pch = 16,
-#           color = "black",
-#           alpha = 0.5)
-############################################
+# 
+# 
+# ############################################
+# 
+# ############# SAVE ENVIRONMENT #############
+# if (isTimeBased) {
+#   save.image(paste0(data_path,
+#                     "/Parameter Run Environments/", 
+#                     "TimeBased", recov_yrs, "yrs", 
+#                     mgmt_benefit, "mgmt.RData"))
+# } else {
+#   save.image(paste0(data_path,
+#                     "/Parameter Run Environments/", 
+#                     "RecovBased", recov_th, "th", 
+#                     mgmt_benefit, "mgmt.RData"))
+# }
+# ############################################
+# 
+# ############ LIBRARY GRAVEYARD #############
+# # library(ncdf4)            # opens ".nc" files
+# # library(colorspace)       # makes colouring plots easier
+# # library(lubridate)        # manipulates date/time easily
+# # library(tidyverse)        # pipes
+# # library(stringr)          # handles strings
+# # library(lpSolve)          # linear programming model solver
+# # library(leaflet)
+# # library(maps)
+# # library(raster)
+# # library(ggspatial)
+# # library(dataaimsr)
+# # library(gisaimsr)
+# # library(ggrepel)
+# # library(leaflet.providers)
+# ############################################
+# 
+# ############# CODE GRAVEYARD ###############
+# 
+# ############################################
+# 
+# ############### VIS GRAVEYARD ##############
+# 
+# # SAMPLE OPT VIS
+# # Plot the sectors with different colours
+# # sector_boundaries$AREA_DESCR <- factor(sector_boundaries$AREA_DESCR, 
+# #                                        levels = gbr_name_order[4:1])
+# # 
+# # sample_reefs_df <- st_as_sf(sample_reefs_df, crs = st_crs(sector_boundaries))
+# # 
+# # sample_reefs_df$x <- st_coordinates(sample_reefs_df$geometry)[,1]
+# # sample_reefs_df$y <- st_coordinates(sample_reefs_df$geometry)[,2]
+# # 
+# # sector_boundaries_fill <- sector_boundaries %>% 
+# #   mutate(single_count = nrow(sample_reefs_df[sample_reefs_df$AREA_DESCR[reef_s_to_manage_s] == 
+# #                                                AREA_DESCR,]), 
+# #          compound_count = nrow(sample_reefs_df[sample_reefs_df$AREA_DESCR[reef_s_to_manage_c] == 
+# #                                                  AREA_DESCR,]))
+# # for (sector in sector_boundaries_fill$AREA_DESCR) {
+# #   sector_boundaries_fill$single_count[sector_boundaries_fill$AREA_DESCR == sector] = 
+# #     sum(sample_reefs_df$AREA_DESCR[reef_s_to_manage_s] == sector)
+# #   sector_boundaries_fill$compound_count[sector_boundaries_fill$AREA_DESCR == sector] = 
+# #     sum(sample_reefs_df$AREA_DESCR[reef_s_to_manage_c] == sector)
+# # }
+# # 
+# # single_p <- ggplot() +
+# #   geom_sf(data = sector_boundaries_fill,
+# #           mapping = aes(fill = single_count), lwd = 0.01) +
+# #   theme_classic() +
+# #   labs(x = "Longitude",
+# #        y = "Latitude",
+# #        tag = "A") +
+# #   scale_fill_continuous(limits = c(min(sector_boundaries_fill$single_count, 
+# #                                        sector_boundaries_fill$compound_count), 
+# #                                    max(sector_boundaries_fill$single_count, 
+# #                                        sector_boundaries_fill$compound_count))) +
+# #   labs(fill = "Number of \nManaged Reefs") +
+# #   theme(plot.tag = element_text()) + 
+# #   annotate("text", x = 145, y = -24, 
+# #            label = TeX(paste0("$E\\[R_{1}\\] = ", floor(actual_exp_recov_s), "$")),
+# #            parse = TRUE) %>%
+# #   suppressMessages()
+# # 
+# # compound_p <- ggplot() +
+# #   geom_sf(data = sector_boundaries_fill,
+# #           mapping = aes(fill = compound_count), lwd = 0.01) +
+# #   theme_classic() +
+# #   labs(x = "Longitude",
+# #        y = "Latitude",
+# #        tag = "B") +
+# #   scale_fill_continuous(limits = c(min(sector_boundaries_fill$single_count, 
+# #                                        sector_boundaries_fill$compound_count), 
+# #                                    max(sector_boundaries_fill$single_count, 
+# #                                        sector_boundaries_fill$compound_count))) +
+# #   theme(plot.tag = element_text()) +
+# #   annotate("text", x = 145, y = -24, 
+# #            label = TeX(paste0("$E\\[R_{2}\\] = ", floor(exp_recov_c), "$")),
+# #            parse = TRUE) %>%
+# #   suppressMessages()
+# # 
+# # ggarrange(single_p, compound_p, 
+# #           ncol=2, nrow=1, 
+# #           common.legend = TRUE, 
+# #           legend="right") %>%
+# #   suppressMessages()
+# # 
+# # if (isTimeBased) {
+# #   ggsave(paste0("../MPhil Thesis/", 
+# #                 num_samples, "Sample_Choropleth_TimeBased", 
+# #                 recov_yrs, "yr", mgmt_benefit, "mgmt.png"), 
+# #          plot = last_plot(), 
+# #          width=8, height=5)
+# # } else {
+# #   ggsave(paste0("../MPhil Thesis/", 
+# #                 num_samples, "Sample_Choropleth_RecovBased", 
+# #                 recov_th, "th", mgmt_benefit, "mgmt.png"), 
+# #          plot = last_plot(), 
+# #          width=8, height=5)
+# # }
+# 
+# # # Locations of (real) reefs in system
+# # ggplot() +
+# #   geom_sf(data = sector_boundaries,
+# #           mapping = aes(fill = AREA_DESCR), lwd = 0.01) +
+# #   theme_classic() +
+# #   labs(x = "Longitude",
+# #        y = "Latitude") +
+# #   scale_fill_brewer(name = "Region", palette = "Spectral") +
+# #   geom_sf(data = all_reefs_sf$geometry,
+# #           pch = 16,
+# #           color = "black",
+# #           alpha = 0.5)
+# ############################################
