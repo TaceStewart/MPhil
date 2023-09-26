@@ -5,9 +5,8 @@
 # Definition of compound if isTimeBased is TRUE: A disturbance occurs within 
 # <recov_yrs> of a previous disturbance
 single_or_compound <- function(obs_by_reef, isTimeBased, recov_th, recov_yrs,
-                               cots_dist, cyc_dist, dhw_dist, inferBaseline = 0) {
-  # Value for % below baseline that reef is impacted by disturbance
-  epsilon <- 0.05 #5%
+                               cots_dist, cyc_dist, dhw_dist, inferBaseline = 0,
+                               epsilon = 0.05, baseline_str = "mean") {
   
   # Create vector of disturbance string names
   distNames <- c("CoTS Outbreak", "Wind Stress", "Heat Stress")
@@ -32,13 +31,31 @@ single_or_compound <- function(obs_by_reef, isTimeBased, recov_th, recov_yrs,
         # Then we have a reef with a baseline
         baseline <- maxPreDistCover*(1 - epsilon)
       } else if (inferBaseline) { 
-        # Then we can make a baseline from any maxima around the global maximum - epsilon
-        baseline <- mean(obs_by_reef$COVER >= max(obs_by_reef$COVER)*(1-epsilon))
+        # Find local maxima within the epsilon range
+        local_maxima <- findpeaks(obs_by_reef$COVER, nups=1, ndowns=1)
+        maxima_values <- local_maxima[,1]
+        
+        if (baseline_str == "min") {
+          # Calculate the minimum of the local maxima
+          baseline <- ifelse(length(local_maxima) > 0,
+                             min(maxima_values),
+                             min(obs_by_reef$COVER))
+        } else if (baseline_str == "mean") {
+          # Calculate the average of the local maxima
+          baseline <- ifelse(length(local_maxima) > 0,
+                             mean(maxima_values),
+                             mean(obs_by_reef$COVER))
+        } else if (baseline_str == "max") {
+          # Calculate the max of the local maxima
+          baseline <- ifelse(length(local_maxima) > 0,
+                             max(maxima_values),
+                             max(obs_by_reef$COVER))
+        }
+        
       } else {
         # Then this reef does not have a baseline
         baseline <- NA
       }
-      
       # Initialise skip variable
       skipNext <- 0
       if (!is.na(baseline)) {

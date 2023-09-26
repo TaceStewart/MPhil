@@ -15,6 +15,7 @@ library(htmltools)
 library(webshot)
 library(hexbin)
 library(latex2exp)
+library(ggrain)
 ##########################################
 
 ############## LOAD DATA #########
@@ -26,7 +27,7 @@ mphil_path <- "../OneDrive - Queensland University of Technology/Documents/MPhil
 data_path <- paste0(mphil_path, "/Data")
 
 # Set the figure output path 
-out_path <- paste0(mphil_path, "/Figures/Sensitivity Outputs")
+out_path <- paste0(mphil_path, "/Figures/DataChapterOutputs")
 
 # Load the shapefile
 shapefile_path <- paste0(data_path, 
@@ -35,10 +36,24 @@ map_data <- st_read(shapefile_path)
 
 # Load .RData
 #load("~/MPhil/Code/Parameter Run Environments/RecovBased0.75th0.1mgmt.RData")
-load(paste0(data_path,
-           "/Parameter Run Environments/TimeBased5yrs0.1mgmt.RData"))
+#load(paste0(data_path,
+#"/Parameter Run Environments/TimeBased5yrs0.1mgmt.RData"))
 # load(paste0(data_path, 
 #             "/Parameter Run Environments/RecovBased0.75th0.1mgmt.RData"))
+
+if (inferBaseline) {
+  inferString <- "CS2"
+} else {
+  inferString <- "CS1"
+}
+
+if (isTimeBased) {
+  recovString <- paste0("Timebased", recov_yrs, 
+                        "yr", mgmt_benefit, "mgmt")
+} else {
+  recovString <- paste0(recov_th, "th", 
+                        mgmt_benefit, "mgmt")
+}
 ##########################################
 
 #### FOR THESIS DATA CHAPTER ####
@@ -108,7 +123,7 @@ leaflet() %>%
                                                     "font-size" = "18px"))) %>%
   saveWidget("gbrmpaMA.html")
 webshot("gbrmpaMA.html", 
-        "../MPhil Thesis/Figures/Data Chapter/Aus_GBR_FourMAs.png",
+        paste0(out_path, "/Aus_GBR_FourMAs.png"),
         vwidth = 700, vheight = 500, zoom = 8)
 
 ##########################################
@@ -130,7 +145,7 @@ ggplot() +
   theme(legend.position = c(0.05, 0.05),
         legend.box.background = element_rect(linewidth=1, colour = "darkgrey"),
         legend.justification = c("left", "bottom"))
-ggsave("../MPhil Thesis/Figures/Data Chapter/AIMSLocByProgram.png", 
+ggsave(paste0(out_path, "/AIMSLocByProgram.png"), 
        plot = last_plot(), width=portrait_dims[1], height=portrait_dims[2])
 ##########################################
 
@@ -148,7 +163,7 @@ ggplot() +
   labs(x = "Program",
        y = "Cover (%)") +
   scale_y_continuous(limits = c(0,100))
-ggsave("../MPhil Thesis/Figures/Data Chapter/CoralCoverBoxPlotByProgram.png", 
+ggsave(paste0(out_path, "/CoralCoverBoxPlotByProgram.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -167,15 +182,32 @@ ggplot() +
   labs(x = "Longitude",
        y = "Latitude",
        fill = "Number of \nSingle \nDisturbances")
-if (isTimeBased) {
-  ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/GBRSingleDistsTimeBased", 
-                recov_yrs, "yr", mgmt_benefit, "mgmt.png"),
-         plot = last_plot(), width=5, height=5)
-} else {
-  ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/GBRSingleDistsRecovBased", 
-                recov_th, "th", mgmt_benefit, "mgmt.png"),
-         plot = last_plot(), width=5, height=5)
+figname <- "/GBRSingleDists"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=portrait_dims[1], height=portrait_dims[2])
+##########################################
+
+######## Single dist number by MA ########
+num_single_per_sector <- map_data
+for (row in 1:nrow(map_data)) {
+  num_single_per_sector$num_single_dists[row] <- sum(all_reefs_sf$single_or_compound == "Single" &
+                                                       all_reefs_sf$AREA_DESCR == map_data$AREA_DESCR[row],
+                                                     na.rm = T)
 }
+ggplot() +
+  theme_classic() +
+  geom_sf(data = num_single_per_sector,
+          size = 0.25,
+          color = "azure4",
+          aes(fill = num_single_dists)) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       fill = "Number of \nSingle \nDisturbances")
+figname <- "/GBRSingleDistsByMA"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=portrait_dims[1], height=portrait_dims[2])
 ##########################################
 
 ########## Compound dist spatial #########
@@ -192,19 +224,122 @@ ggplot() +
            na.rm = TRUE) +
   labs(x = "Longitude",
        y = "Latitude",
-       fill = "Number of \nCompound \nDisturbances")
-if (isTimeBased) {
-  ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/GBRCompoundDistsTimeBased", 
-                recov_yrs, "yr", mgmt_benefit, "mgmt.png"),
-         plot = last_plot(), width=5, height=5)
-} else {
-  ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/GBRCompoundDistsRecovBased", 
-                recov_th, "th", mgmt_benefit, "mgmt.png"),
-         plot = last_plot(), width=5, height=5)
+       fill = "Number of \nCumulative \nDisturbances")
+figname <- "/GBRCompoundDists"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=portrait_dims[1], height=portrait_dims[2])
+##########################################
+
+###### Cumulative dist number by MA ######
+num_cumulative_per_sector <- map_data
+for (row in 1:nrow(map_data)) {
+  num_cumulative_per_sector$num_cumulative_dists[row] <- sum(all_reefs_sf$single_or_compound == "Compound" &
+                                                               all_reefs_sf$AREA_DESCR == map_data$AREA_DESCR[row],
+                                                             na.rm = T)
 }
-summarised_reefs <- all_reefs_sf %>%
-  group_by(REEF_NAME) %>%
-  summarise(total = n())
+ggplot() +
+  theme_classic() +
+  geom_sf(data = num_cumulative_per_sector,
+          size = 0.25,
+          color = "azure4",
+          aes(fill = num_cumulative_dists)) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       fill = "Number of \nCumulative \nDisturbances")
+figname <- "/GBRCumulativeDistsByMA"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=portrait_dims[1], height=portrait_dims[2])
+##########################################
+
+####### Pr Single & Cumul Dists BP #######
+SC_BP_data <- reef_df %>%
+  subset(select = c(sector, prob_s_dist, prob_c_dist)) %>%
+  pivot_longer(cols = c(prob_s_dist, prob_c_dist),
+               values_to = "Disturbance_Probability")
+colnames(SC_BP_data) <- c("Sector", "S_or_C", "Disturbance_Probability")
+ggplot() +
+  theme_classic() +
+  geom_boxplot(data = SC_BP_data,
+               size = 0.25,
+               fill = NA,
+               aes(x = factor(gsub(" Management Area", "", Sector),
+                              levels = gsub(" Management Area", "", 
+                                            map_data$AREA_DESCR[order(map_data$OBJECTID, 
+                                                                      decreasing = T)])),
+                   y = as.numeric(Disturbance_Probability),
+                   color = S_or_C)) +
+  scale_color_manual(labels = c("Cumulative", 
+                                "Single"),
+                     values = c("steelblue1", "steelblue4")) +
+  labs(x = "Management Area",
+       y = "Probability of Disturbance",
+       color = "Disturbance Type")
+figname <- "/GBRProbDistBPByMA"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
+##########################################
+
+####### Pr Single & Cumul Impact BP ######
+SC_BP_Impact_data <- reef_df %>%
+  subset(select = c(sector, prob_s_impact, prob_c_impact)) %>%
+  pivot_longer(cols = c(prob_s_impact, prob_c_impact),
+               values_to = "Impact_Probability") %>%
+  na.omit()
+colnames(SC_BP_Impact_data) <- c("Sector", "S_or_C", "Impact_Probability")
+ggplot() +
+  theme_classic() +
+  geom_boxplot(data = SC_BP_Impact_data,
+               size = 0.25,
+               fill = NA,
+               aes(x = factor(gsub(" Management Area", "", Sector),
+                              levels = gsub(" Management Area", "", 
+                                            map_data$AREA_DESCR[order(map_data$OBJECTID, 
+                                                                      decreasing = T)])),
+                   y = as.numeric(Impact_Probability),
+                   color = S_or_C)) +
+  scale_color_manual(labels = c("Cumulative", 
+                                "Single"),
+                     values = c("steelblue1", "steelblue4")) +
+  labs(x = "Management Area",
+       y = "Probability of Impact After Disturbance",
+       color = "Disturbance Type")
+figname <- "/GBRProbImpactBPByMA"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
+##########################################
+
+####### Pr Single & Cumul Recov BP #######
+SC_BP_Recov_data <- reef_df %>%
+  subset(select = c(sector, prob_s_recov, prob_c_recov)) %>%
+  pivot_longer(cols = c(prob_s_recov, prob_c_recov),
+               values_to = "Recov_Probability") %>%
+  na.omit()
+colnames(SC_BP_Recov_data) <- c("Sector", "S_or_C", "Recov_Probability")
+ggplot() +
+  theme_classic() +
+  geom_boxplot(data = SC_BP_Recov_data,
+               size = 0.25,
+               fill = NA,
+               aes(x = factor(gsub(" Management Area", "", Sector),
+                              levels = gsub(" Management Area", "", 
+                                            map_data$AREA_DESCR[order(map_data$OBJECTID, 
+                                                                      decreasing = T)])),
+                   y = as.numeric(Recov_Probability),
+                   color = S_or_C)) +
+  scale_color_manual(labels = c("Cumulative", 
+                                "Single"),
+                     values = c("steelblue1", "steelblue4")) +
+  labs(x = "Management Area",
+       y = "Annual Probability of Recovery After Disturbance",
+       color = "Disturbance Type")
+figname <- "/GBRProbRecovBPByMA"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
 ##### Rebe Reef location (Crop after) #####
@@ -247,7 +382,7 @@ leaflet() %>%
                                                     "font-size" = "12px"))) %>%
   saveWidget("rebe.html")
 webshot("rebe.html", 
-        "../MPhil Thesis/Figures/Data Chapter/GBR_RebeReef.png",
+        paste0(out_path, "/GBR_RebeReef.png"),
         vwidth = 650, vheight = 500, zoom = 8)
 ##########################################
 
@@ -267,7 +402,9 @@ ggplot(data = all_reefs_sf[which(grepl("REBE", all_reefs_sf$REEF_NAME)),],
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(limits = c(0,50), 
                      breaks = seq(0, 50, 10))
-ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCoralCover.png", 
+figname <- "/RebeReefCoralCover"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -312,7 +449,7 @@ ggplot(data = rebe_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(limits = c(0,50), 
                      breaks = seq(0, 50, 10))
-ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCoralCover_AllDists.png", 
+ggsave(paste0(out_path, "/RebeReefCoralCover_AllDists.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -375,7 +512,7 @@ ggplot(data = rebe_reef) +
     sec.axis = sec_axis(~.*scaleFactor, name="Coral Cover (%)")) +
   theme(axis.title.y.right=element_text(color="azure4"),
         axis.text.y.right=element_text(color="azure4"))
-ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefDisturbanceWithObs.png", 
+ggsave(paste0(out_path, "/RebeReefDisturbanceWithObs.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -424,15 +561,15 @@ ggplot(data = rebe_reef) +
   scale_y_continuous(# Features of the first axis
     name = "% of Disturbance Level",
     breaks = c(0, 50, 100, 150, 200, 250, 300))
-ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefDisturbancesOnly.png", 
+ggsave(paste0(out_path, "/RebeReefDisturbancesOnly.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
 ################ Rebe WH #################
 ggplot(data = rebe_reef,
        mapping = aes(x = YEAR, 
-                           y = Hs4MW_value,
-                           color = "Wind Stress")) +
+                     y = Hs4MW_value,
+                     color = "Wind Stress")) +
   theme_classic() +
   geom_point(alpha = 0.75,
              size = 1.5) +
@@ -447,7 +584,7 @@ ggplot(data = rebe_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(# Features of the first axis
     name = TeX("Hours of $\\geq$ 4m Wave Height"))
-ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefWHwithdistlvl.png", 
+ggsave(paste0(out_path, "/RebeReefWHwithdistlvl.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -470,7 +607,7 @@ ggplot(data = rebe_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(# Features of the first axis
     name = TeX("Number of Degree-Heating-Weeks"))
-ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefDHWwithdistlvl.png", 
+ggsave(paste0(out_path, "/RebeReefDHWwithdistlvl.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -493,7 +630,7 @@ ggplot(data = rebe_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(# Features of the first axis
     name = TeX("Number of Crown-of-Thorns Starfish per Manta-Tow"))
-ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCOTSwithdistlvl.png", 
+ggsave(paste0(out_path, "/RebeReefCOTSwithdistlvl.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -513,8 +650,8 @@ ggplot(data = rebe_reef,
             alpha = .3,
             na.rm = TRUE) + 
   scale_fill_manual(name = "Event Type",
-                      values = c("orange", "yellow"),
-                      na.translate = F) +
+                    values = c("orange", "yellow"),
+                    na.translate = F) +
   geom_point(colour = "azure4",
              size = 1.5,
              alpha = 0.75) +
@@ -533,13 +670,10 @@ ggplot(data = rebe_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(limits = c(0,50), 
                      breaks = seq(0, 50, 10))
-if (isTimeBased) {
-  ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCompoundandSingleTimeBasedWithDist.png", 
-         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
-} else {
-  ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCompoundandSingleRecovBasedWithDist.png", 
-         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
-}
+figname <- "/RebeReefCompoundandSingleWithDist"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
 ######## Rebe single and compound ########
@@ -576,16 +710,12 @@ ggplot(data = rebe_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(limits = c(0,50), 
                      breaks = seq(0, 50, 10))
-if (isTimeBased) {
-  ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCompoundandSingleTimeBased.png", 
-         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
-} else {
-  ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCompoundandSingleRecovBased.png", 
-         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
-}
+figname <- "/RebeReefCompoundandSingle"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
-reef_name <- "HASTINGS REEF"
 ######## Rebe single and compound ########
 rebe_reef$distYears <- ifelse(is.na(rebe_reef$yearDists), NA, rebe_reef$YEAR)
 SingCompDistYears <- ifelse(is.na(rebe_reef$single_or_compound), NA, rebe_reef$YEAR)
@@ -602,8 +732,8 @@ ggplot(data = rebe_reef,
             alpha = .3,
             na.rm = TRUE) + 
   scale_fill_manual(name = "Event Type",
-                      values = c("orange", "yellow"),
-                      na.translate = F) +
+                    values = c("orange", "yellow"),
+                    na.translate = F) +
   geom_point(colour = "azure4",
              size = 1.5,
              alpha = 0.75) +
@@ -620,17 +750,13 @@ ggplot(data = rebe_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(limits = c(0,50), 
                      breaks = seq(0, 50, 10))
-if (isTimeBased) {
-  ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCompoundandSingleTimeBased.png", 
-         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
-} else {
-  ggsave("../MPhil Thesis/Figures/Data Chapter/RebeReefCompoundandSingleRecovBased.png", 
-         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
-}
+figname <- "/RebeReefCompoundandSingle"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
 reef_name <- "HASTINGS REEF"
-
 ####### reef_name linear with dists ######
 obs_by_reef <- all_reefs_sf[all_reefs_sf$REEF_NAME == reef_name,]
 unique(obs_by_reef$distType)
@@ -673,7 +799,7 @@ ggplot(data = obs_by_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(limits = c(0,50), 
                      breaks = seq(0, 50, 10))
-ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/", reef_name, "_CoralCover_WDists.png"), 
+ggsave(paste0(out_path, "/", reef_name, "_CoralCover_WDists.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -736,7 +862,7 @@ ggplot(data = obs_by_reef) +
     sec.axis = sec_axis(~.*scaleFactor, name="Coral Cover (%)")) +
   theme(axis.title.y.right=element_text(color="azure4"),
         axis.text.y.right=element_text(color="azure4"))
-ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/", reef_name, "_DisturbanceWithObs.png"), 
+ggsave(paste0(out_path, "/", reef_name, "_DisturbanceWithObs.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -785,7 +911,7 @@ ggplot(data = obs_by_reef) +
   scale_y_continuous(# Features of the first axis
     name = "% of Disturbance Level",
     breaks = c(0, 50, 100, 150, 200, 250, 300))
-ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/", reef_name, "_DisturbancesOnly.png"), 
+ggsave(paste0(out_path, "/", reef_name, "_DisturbancesOnly.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -808,7 +934,7 @@ ggplot(data = obs_by_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(# Features of the first axis
     name = TeX("Hours of $\\geq$ 4m Wave Height"))
-ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/", reef_name, "_WHwithdistlvl.png"), 
+ggsave(paste0(out_path, "/", reef_name, "_WHwithdistlvl.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -831,7 +957,7 @@ ggplot(data = obs_by_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(# Features of the first axis
     name = TeX("Number of Degree-Heating-Weeks"))
-ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/", reef_name, "_DHWwithdistlvl.png"), 
+ggsave(paste0(out_path, "/", reef_name, "_DHWwithdistlvl.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -854,7 +980,7 @@ ggplot(data = obs_by_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(# Features of the first axis
     name = TeX("Number of Crown-of-Thorns Starfish per Manta-Tow"))
-ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/", reef_name, "_COTSwithdistlvl.png"), 
+ggsave(paste0(out_path, "/", reef_name, "_COTSwithdistlvl.png"), 
        plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
@@ -891,13 +1017,10 @@ ggplot(data = obs_by_reef,
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(limits = c(0,50), 
                      breaks = seq(0, 50, 10))
-if (isTimeBased) {
-  ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/", reef_name, "_CompoundandSingleTimeBased.png"), 
-         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
-} else {
-  ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/", reef_name, "_CompoundandSingleRecovBased.png"), 
-         plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
-}
+figname <- paste0("/", reef_name, "_CompoundandSingleTimeBased")
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
 ##########################################
 
 #### reef_name location (Crop after) #####
@@ -941,62 +1064,56 @@ leaflet() %>%
                                                     "font-size" = "12px"))) %>%
   saveWidget(paste0(reef_name, ".html"))
 webshot(paste0(reef_name, ".html"), 
-        paste0("../MPhil Thesis/Figures/Data Chapter/GBR_", reef_name, ".png"),
+        paste0(out_path, "/GBR_", reef_name, ".png"),
         vwidth = 650, vheight = 500, zoom = 8)
 ##########################################
 
-##### VIS GRAVEYARD #####
+############ RAIN CLOUD PLOT #############
+ggplot(iris, aes(x = 1, y = Sepal.Length)) +
+  geom_rain() + coord_flip()
+ggplot(iris, aes(x = 1, y = Sepal.Length, fill = Species)) +
+  geom_rain(alpha = .5) + coord_flip()
+ggplot(iris, aes(x = Species, y = Sepal.Length, fill = 	Species)) +
+  geom_rain(rain.side = 'l') + coord_flip()
 
-# Geom point vis over map for recovery rate/time distribution, colour by number
-# ggplot() +
-#   theme_classic() +
-#   geom_sf(data = map_data,
-#           size = 0.5,
-#           color = "azure4",
-#           fill = NA) +
-#   geom_point(data = all_reefs_sf[!is.na(all_reefs_sf$recovTime),],
-#              aes(X, Y, colour = recovTime),
-#              size = 1.5) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        colour = "Average \nRecovery \nTime (years)")
-# if (isTimeBased) {
-#   ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/GBRAveRecoveryTime_TimeBased", 
-#                 recov_yrs, "yr", mgmt_benefit, "mgmt.png"),
-#          plot = last_plot(), width=5, height=5)
-# } else {
-#   ggsave(paste0("../MPhil Thesis/Figures/Data Chapter/GBRAveRecoveryTime_RecovBased", 
-#                 recov_th, "th", mgmt_benefit, "mgmt.png"),
-#          plot = last_plot(), width=5, height=5)
-# }
+# Want MA on y axis, prob recov state on x axis, fill by single/comp
+SC_RC_data <- reef_df %>%
+  subset(select = c(sector, pr_recov_sing_unmgd, pr_recov_comp_unmgd)) %>%
+  pivot_longer(cols = c(pr_recov_sing_unmgd, pr_recov_comp_unmgd),
+               values_to = "Recov_Probability")
+colnames(SC_RC_data) <- c("Sector", "S_or_C", "Recov_Probability")
+num_elements <- SC_RC_data %>%
+  group_by(Sector) %>%
+  summarise(number = n())
+xy <- st_coordinates(st_centroid(sector_boundaries$geometry))
+gbr_name_order <- sector_boundaries$AREA_DESCR[order(xy[,"X"], xy[,"Y"])]
+num_elements <- num_elements[order(gbr_name_order),]
+num_elements$number <- num_elements$number/2
+ggplot(SC_RC_data, 
+       aes(x = factor(gsub(" Management Area", "", Sector),
+                      levels = gsub(" Management Area", "", 
+                                    map_data$AREA_DESCR[order(map_data$OBJECTID)])), 
+           y = Recov_Probability, 
+           fill = S_or_C,
+           color = S_or_C)) +
+  theme_classic() +
+  geom_rain(violin.args = c(color = NA, alpha = .6),
+            point.args = c(alpha = .6),
+            boxplot.args = c(alpha = 0.6),
+            boxplot.args.pos = c(width = .1)) + 
+  coord_flip() +
+  scale_color_manual(labels = c("Cumulative + single", 
+                                "Single only"),
+                     values = c("steelblue1", "steelblue4"),
+                     guide = "none") +
+  scale_fill_manual(labels = c("Cumulative + single", 
+                               "Single only"),
+                    values = c("steelblue1", "steelblue4")) +
+  labs(x = "Management Area",
+       y = "Probability of Reefs Being in a Recovered State",
+       fill = "Disturbances\nConsidered")
 
-## Plot the sectors with different colours
-# ggplot() +
-#   geom_sf(data = map_data,
-#           mapping = aes(fill = AREA_DESCR), lwd = 0.01) +
-#   theme_classic() +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = "The Great Barrier Reef",
-#        subtitle = "by GBRMPA Management Area") +
-#   scale_fill_brewer(name = "Region", palette = "Spectral") +
-#   geom_sf(data = all_reefs_sf$geometry,
-#           pch = 1,
-#           color = "black")
-# 
-# # Leaflet plot of sectors
-# leaflet() %>%
-#   addTiles() %>%
-#   addPolygons(data = map_data, 
-#               popup = ~AREA_DESCR,
-#               color = "blue",
-#               opacity = 1,
-#               weight = 1)
-# 
-# leaflet() %>%
-#   addProviderTiles("Esri.WorldGrayCanvas") %>%
-#   addPolygons(data = map_data, 
-#               popup = ~AREA_DESCR,
-#               color = "darkgrey",
-#               opacity = 1,
-#               weight = 1)
+figname <- "/GBRRecoveredStateRPByMA"
+ggsave(paste0(out_path, figname, recovString, 
+              inferString, ".png"),
+       plot = last_plot(), width=landscape_dims[1], height=landscape_dims[2])
