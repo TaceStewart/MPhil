@@ -1,0 +1,6 @@
+{
+    "r.editor.bracesOnNewLine": true,
+    "r.linting.camelCase": true,
+    "r.linting.enable": true,
+    "r.linting.lineLength": false
+}
