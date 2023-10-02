@@ -127,8 +127,8 @@ overall_unknown_count <- 0
 all_reefs_sf <- all_reefs_sf %>%
   mutate(
     isDisturbed = (all_reefs_sf$COTS_value >= cots_dist |
-      all_reefs_sf$Hs4MW_value >= cyc_dist |
-      all_reefs_sf$DHW_value >= dhw_dist),
+                   all_reefs_sf$Hs4MW_value >= cyc_dist |
+                   all_reefs_sf$DHW_value >= dhw_dist),
     isImpacted = 0,
     single_or_compound = NA,
     distType = NA,
