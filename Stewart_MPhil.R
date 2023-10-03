@@ -70,6 +70,8 @@ sector_boundaries <- st_read(shapefile_path,
 ###### SET VARIABLES TO CHANGE ON RUN ######
 # Should the baseline be inferred if non-existent at start of obs period?
 infer_baseline <- 0
+epsilon = 0.05
+baseline_str = "mean"
 
 # Time based or recovery based compounding?
 #  Note: Set to TRUE for time-based compounding or FALSE for recovery-based
@@ -126,14 +128,14 @@ overall_unknown_count <- 0
 # - recovery time for each dist
 all_reefs_sf <- all_reefs_sf %>%
   mutate(
-    isDisturbed = (all_reefs_sf$COTS_value >= cots_dist |
-                   all_reefs_sf$Hs4MW_value >= cyc_dist |
-                   all_reefs_sf$DHW_value >= dhw_dist),
-    isImpacted = 0,
+    is_disturbed = (all_reefs_sf$COTS_value >= cots_dist |
+                     all_reefs_sf$Hs4MW_value >= cyc_dist |
+                     all_reefs_sf$DHW_value >= dhw_dist),
+    is_impacted = 0,
     single_or_compound = NA,
-    distType = NA,
-    recovYear = NA,
-    recovTime = NA,
+    dist_type = NA,
+    recov_year = NA,
+    recov_time = NA,
     r_given_impact = NA
   )
 
@@ -186,7 +188,9 @@ for (reef_name in reef_names) {
       cots_dist = cots_dist,
       cyc_dist = cyc_dist,
       dhw_dist = dhw_dist,
-      infer_baseline = infer_baseline
+      infer_baseline = infer_baseline, 
+      epsilon = epsilon,
+      baseline_str = baseline_str
     )
   } else {
     obs_by_reef <- single_or_compound(
@@ -196,7 +200,9 @@ for (reef_name in reef_names) {
       cots_dist = cots_dist,
       cyc_dist = cyc_dist,
       dhw_dist = dhw_dist,
-      infer_baseline = infer_baseline
+      infer_baseline = infer_baseline, 
+      epsilon = epsilon,
+      baseline_str = baseline_str
     )
   }
   # Calculate number of years observed inclusive
@@ -210,11 +216,11 @@ for (reef_name in reef_names) {
   # Prob Impacted given disturbance: P(A|B) = P(A & B)/P(B)
   prob_s_impact <- ifelse(num_single == 0,
     NA,
-    sum(single_dist$isImpacted & single_dist$isDisturbed,
-      na.rm = T
+    sum(single_dist$is_impacted & single_dist$is_disturbed,
+      na.rm = TRUE
     ) /
-      sum(single_dist$isDisturbed,
-        na.rm = T
+      sum(single_dist$is_disturbed,
+        na.rm = TRUE
       )
   )
   prob_s_recov <- ifelse(any(!is.na(single_dist$r_given_impact)),
@@ -227,10 +233,10 @@ for (reef_name in reef_names) {
   prob_c_dist <- num_comp / yrs_obsvd
   prob_c_impact <- ifelse(num_comp == 0,
     NA,
-    sum(comp_dist$isImpacted & comp_dist$isDisturbed,
+    sum(comp_dist$is_impacted & comp_dist$is_disturbed,
       na.rm = TRUE
     ) /
-      sum(comp_dist$isDisturbed,
+      sum(comp_dist$is_disturbed,
         na.rm = TRUE
       )
   )
@@ -240,49 +246,49 @@ for (reef_name in reef_names) {
   )
   # Get count of events for the reef and add to total event_counts df
   event_counts_rf <- c(
-    H = sum(obs_by_reef$distType == "Heat Stress",
+    H = sum(obs_by_reef$dist_type == "Heat Stress",
       na.rm = TRUE
     ),
-    Cy = sum(obs_by_reef$distType == "Wind Stress",
+    Cy = sum(obs_by_reef$dist_type == "Wind Stress",
       na.rm = TRUE
     ),
-    Co = sum(obs_by_reef$distType == "CoTS Outbreak",
+    Co = sum(obs_by_reef$dist_type == "CoTS Outbreak",
       na.rm = TRUE
     ),
-    HH = sum(obs_by_reef$distType == "Heat Stress, Heat Stress",
+    HH = sum(obs_by_reef$dist_type == "Heat Stress, Heat Stress",
       na.rm = TRUE
     ),
-    HCy = sum(obs_by_reef$distType == "Heat Stress, Wind Stress",
+    HCy = sum(obs_by_reef$dist_type == "Heat Stress, Wind Stress",
       na.rm = TRUE
     ),
-    CyH = sum(obs_by_reef$distType == "Wind Stress, Heat Stress",
+    CyH = sum(obs_by_reef$dist_type == "Wind Stress, Heat Stress",
       na.rm = TRUE
     ),
-    CyCy = sum(obs_by_reef$distType == "Wind Stress, Wind Stress",
+    CyCy = sum(obs_by_reef$dist_type == "Wind Stress, Wind Stress",
       na.rm = TRUE
     ),
-    CyCo = sum(obs_by_reef$distType == "Wind Stress, CoTS Outbreak",
+    CyCo = sum(obs_by_reef$dist_type == "Wind Stress, CoTS Outbreak",
       na.rm = TRUE
     ),
-    CoCy = sum(obs_by_reef$distType == "CoTS Outbreak, Wind Stress",
+    CoCy = sum(obs_by_reef$dist_type == "CoTS Outbreak, Wind Stress",
       na.rm = TRUE
     ),
-    CoCo = sum(obs_by_reef$distType == "CoTS Outbreak, CoTS Outbreak",
+    CoCo = sum(obs_by_reef$dist_type == "CoTS Outbreak, CoTS Outbreak",
       na.rm = TRUE
     ),
-    CoH = sum(obs_by_reef$distType == "CoTS Outbreak, Heat Stress",
+    CoH = sum(obs_by_reef$dist_type == "CoTS Outbreak, Heat Stress",
       na.rm = TRUE
     ),
-    HCo = sum(obs_by_reef$distType == "Heat Stress, CoTS Outbreak",
+    HCo = sum(obs_by_reef$dist_type == "Heat Stress, CoTS Outbreak",
       na.rm = TRUE
     ),
     Other = 0
   )
   event_counts_rf[["Other"]] <- event_counts_rf[["Other"]] +
-    sum(!is.na(obs_by_reef$distType)) -
+    sum(!is.na(obs_by_reef$dist_type)) -
     sum(event_counts_rf)
   event_counts <- event_counts + event_counts_rf
-  reef_unknown <- sum(grepl("Unknown", obs_by_reef$recovYear), na.rm = TRUE)
+  reef_unknown <- sum(grepl("Unknown", obs_by_reef$recov_year), na.rm = TRUE)
   overall_unknown_count <- overall_unknown_count + reef_unknown
 
   ## Get latitude & longitude
@@ -330,12 +336,12 @@ compound_reefs <- reef_df %>%
   filter(num_comp > 0)
 
 # Game growth rates following single and compound events
-single_dists$recovTime <- as.numeric(single_dists$recovTime)
+single_dists$recov_time <- as.numeric(single_dists$recov_time)
 single_reefs$prob_s_recov <- as.numeric(single_reefs$prob_s_recov)
-compound_dists$recovTime <- as.numeric(compound_dists$recovTime)
+compound_dists$recov_time <- as.numeric(compound_dists$recov_time)
 compound_reefs$prob_c_recov <- as.numeric(compound_reefs$prob_c_recov)
 #   Average game recovery time after all single disturbances
-game_s_dist_mean <- 1 / mean(single_dists$recovTime, na.rm = TRUE)
+game_s_dist_mean <- 1 / mean(single_dists$recov_time, na.rm = TRUE)
 #   Average game r (single) across reefs
 game_s_reef_mean <- mean(single_reefs$prob_s_recov, na.rm = TRUE)
 #   Game confidence interval (95 %)
@@ -344,7 +350,7 @@ game_s_reef_ci <- quantile(single_reefs$prob_s_recov,
   na.rm = TRUE
 )
 #   Average game recovery time after all compound disturbances
-game_c_dist_mean <- 1 / mean(compound_dists$recovTime,
+game_c_dist_mean <- 1 / mean(compound_dists$recov_time,
   na.rm = TRUE
 )
 #   Average game r (compound) across reefs
