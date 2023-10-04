@@ -197,7 +197,7 @@ dist_finder <- function(df, is_time_based, recov_th, recov_yrs,
 
     # Add column for whether there's a disturbance that year
     dists <- dists %>%
-      mutate(isDisturbed = (dists$COTS_value >= cots_dist |
+      mutate(is_disturbed = (dists$COTS_value >= cots_dist |
         dists$Hs4MW_value >= cyc_dist |
         dists$annMaxDHW_value >= dhw_dist))
 
@@ -212,7 +212,7 @@ dist_finder <- function(df, is_time_based, recov_th, recov_yrs,
     skipNext <- 0
     single_dists <- 0
     compound_dists <- 0
-    for (row in which(dists$isDisturbed)) {
+    for (row in which(dists$is_disturbed)) {
       if (skipNext > 0) {
         skipNext <- skipNext - 1
       } else {
@@ -221,7 +221,7 @@ dist_finder <- function(df, is_time_based, recov_th, recov_yrs,
         current_year <- dists$year[row]
 
         # Check for disturbances within the recovery_time
-        while (any(dists$isDisturbed[dists$year > current_year &
+        while (any(dists$is_disturbed[dists$year > current_year &
           dists$year <= current_year + recovery_time])) {
           temp_dists <- dists[dists$year > current_year &
             dists$year <= current_year + recovery_time, ]

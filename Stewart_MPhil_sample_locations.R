@@ -75,7 +75,7 @@ dhw_dist <- 4  # degree heating weeks
 # Initialise a list of random points
 random_points <- data.frame(point_id = seq_len(num_samples),
                             Location = integer(length = num_samples),
-                            Sector = rep(sector_boundaries$AREA_DESCR, 
+                            sector = rep(sector_boundaries$AREA_DESCR, 
                                          each = reefs_per_mgmt))
 ############################################
 
@@ -197,7 +197,7 @@ geom_closest_dhw <- distinct_sample_geom %>%
 # Initialise an empty data frame
 columns <- c("point_id", "point_loc", "REEF_ID",
              "year", "COTS_value", "Hs4MW_value", 
-             "annMaxDHW_value", "is_disturbed")
+             "annMaxDHW_value", "is_disturbed", "sector")
 random_reefs_df <- matrix(nrow = 0, 
                           ncol = length(columns)) %>%
   data.frame()
@@ -245,7 +245,9 @@ for (i in seq_len(nrow(random_points))) {
            annMaxDHW_value = dhw_row$annMaxDHW_value,
            point_id = rep(i, nrow(cots_row)),
            point_loc = rep(random_points$Location[i], 
-                           nrow(cots_row)))
+                           nrow(cots_row)),
+           sector = rep(random_points$sector[i], 
+                        nrow(cots_row)))
   dists <- dists %>%
     mutate(is_disturbed = (dists$COTS_value >= cots_dist | 
                             dists$Hs4MW_value >= cyc_dist |
