@@ -1,5 +1,5 @@
-# p_calculator takes in a dataframe df of reefs and calculates average
-#   probability of the reef being in a recovered state, then returns the df with 
+# p_calculator takes in a dataframe reef_df of reefs and calculates average
+#   probability of the reef being in a recovered state, then returns the reef_df with 
 #   these new values. 
 p_calculator <- function (reef_df, mgmt_benefit) {
   reef_df <- mutate(reef_df, 

@@ -7,7 +7,7 @@
 rm(list = ls())
 
 # Clear plots
-if(!is.null(dev.list())) dev.off()
+if (!is.null(dev.list())) dev.off()
 
 # Clear commands
 cat("\014")
@@ -81,9 +81,9 @@ random_points <- data.frame(point_id = seq_len(num_samples),
 
 ########## SAMPLE REEF LOCATIONS ###########
 # Get random locations in each management area for sample reefs 
-for (row in 1:nrow(sector_boundaries)) {
-  from_row <- (row - 1)*reefs_per_mgmt + 1
-  to_row <- row*reefs_per_mgmt
+for (row in seq_len(nrow(sector_boundaries))) {
+  from_row <- (row - 1) * reefs_per_mgmt + 1
+  to_row <- row * reefs_per_mgmt
   random_points$Location[from_row:to_row] <- sector_boundaries$geometry[row] %>%
     st_sample(size = reefs_per_mgmt, 
               type = "random")
@@ -197,7 +197,7 @@ geom_closest_dhw <- distinct_sample_geom %>%
 # Initialise an empty data frame
 columns <- c("point_id", "point_loc", "REEF_ID",
              "year", "COTS_value", "Hs4MW_value", 
-             "annMaxDHW_value", "isDisturbed")
+             "annMaxDHW_value", "is_disturbed")
 random_reefs_df <- matrix(nrow = 0, 
                           ncol = length(columns)) %>%
   data.frame()
@@ -247,7 +247,7 @@ for (i in seq_len(nrow(random_points))) {
            point_loc = rep(random_points$Location[i], 
                            nrow(cots_row)))
   dists <- dists %>%
-    mutate(isDisturbed = (dists$COTS_value >= cots_dist | 
+    mutate(is_disturbed = (dists$COTS_value >= cots_dist | 
                             dists$Hs4MW_value >= cyc_dist |
                             dists$annMaxDHW_value >= dhw_dist)) %>%
     filter(year < 2017) %>%
@@ -265,7 +265,7 @@ for (i in seq_len(nrow(random_points))) {
 ################ SAVE DATA #################
 # Save to an rds file
 saveRDS(random_reefs_df, file = paste0(data_path,
-                                       "/random_reefs_df.rds"))
+                                       "/sample_reefs.rds"))
 end_time <- Sys.time()
 end_time - start_time
 ############################################

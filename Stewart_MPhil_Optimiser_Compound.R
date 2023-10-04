@@ -1,4 +1,4 @@
-optimiserCompound <- function(df, mgmt_constraint) {
+optimiser_compound <- function(df, mgmt_constraint) {
   # Set up compound linear programming model
   num_reefs <- nrow(df)
   comp_result <- MIPModel() %>% 

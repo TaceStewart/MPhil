@@ -1,4 +1,4 @@
-optimiserSingle <- function(df, mgmt_constraint) {
+optimiser_single <- function(df, mgmt_constraint) {
   # Set up single linear programming model
   num_reefs <- nrow(df)
   sing_result <- MIPModel() %>% 
