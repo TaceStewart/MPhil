@@ -34,7 +34,7 @@ source("Stewart_MPhil_ortiz_r_func.R")
 source("Stewart_MPhil_p_calc.R")
 source("Stewart_MPhil_optimiser_single.R")
 source("Stewart_MPhil_optimiser_compound.R")
-source("Stewart_MPhil_sampler.R")
+source("sampler_v2.R")
 source("Stewart_MPhil_dist_finder.R")
 source("Stewart_MPhil_analyser.R")
 
@@ -70,7 +70,7 @@ shapefile_path <- paste0(
   "Barrier_Reef_Marine_Park.shp"
 )
 sector_boundaries <- st_read(shapefile_path,
-                             quiet = TRUE
+  quiet = TRUE
 )
 ############################################
 
@@ -111,8 +111,8 @@ run_simulations <- TRUE
 # Set number of simulations, n_sims
 n_sims <- 100
 
-# Set number of reefs, n
-n <- 100
+# Set number of sample reefs, num_samples
+num_samples <- 1000
 ############################################
 
 ####### INITIALISE VARIABLES AND DFS #######
@@ -136,8 +136,8 @@ overall_unknown_count <- 0
 all_reefs_sf <- all_reefs_sf %>%
   mutate(
     is_disturbed = (all_reefs_sf$COTS_value >= cots_dist |
-                      all_reefs_sf$Hs4MW_value >= cyc_dist |
-                      all_reefs_sf$DHW_value >= dhw_dist),
+      all_reefs_sf$Hs4MW_value >= cyc_dist |
+      all_reefs_sf$DHW_value >= dhw_dist),
     is_impacted = 0,
     single_or_compound = NA,
     dist_type = NA,
@@ -193,21 +193,21 @@ game_s_dist_mean <- 1 / mean(single_dists$recov_time, na.rm = TRUE)
 game_s_reef_mean <- mean(single_reefs$prob_s_recov, na.rm = TRUE)
 #   Game confidence interval (95 %)
 game_s_reef_ci <- quantile(single_reefs$prob_s_recov,
-                           c(0.025, 0.975),
-                           na.rm = TRUE
+  c(0.025, 0.975),
+  na.rm = TRUE
 )
 #   Average game recovery time after all compound disturbances
 game_c_dist_mean <- 1 / mean(compound_dists$recov_time,
-                             na.rm = TRUE
+  na.rm = TRUE
 )
 #   Average game r (compound) across reefs
 game_c_reef_mean <- mean(compound_reefs$prob_c_recov,
-                         na.rm = TRUE
+  na.rm = TRUE
 )
 #   Game confidence interval (95 %)
 game_c_reef_ci <- quantile(compound_reefs$prob_c_recov,
-                           c(0.025, 0.975),
-                           na.rm = TRUE
+  c(0.025, 0.975),
+  na.rm = TRUE
 )
 
 # Calculate probability of reef being in a recovered state
@@ -250,126 +250,126 @@ sector_df <- data.frame(
 for (sector in unique(reef_df$management_region)) {
   reef_df_indx <- which(reef_df$management_region == sector)
   sec_df_indx <- which(sector_df$sector == sector)
-  
+
   # Calculate number of single disturbances
   sector_df$num_single[sec_df_indx] <- reef_df$num_single[reef_df_indx] %>%
     as.numeric() %>%
     sum(na.rm = TRUE)
-  
+
   # Calculate number of compound disturbances
   sector_df$num_compound[sec_df_indx] <- reef_df$num_comp[reef_df_indx] %>%
     as.numeric() %>%
     sum(na.rm = TRUE)
-  
+
   # Calculate probability of single disturbance
   sector_df$ave_prob_s_dist[sec_df_indx] <- reef_df$prob_s_dist[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate confidence interval of recovery from single dist (unmanaged)
   ci_s_dist <- reef_df$prob_s_dist[reef_df_indx] %>%
     as.numeric() %>%
     quantile(c(0.025, 0.975), na.rm = TRUE)
   sector_df$s_dist_ci_lwr[sec_df_indx] <- ci_s_dist[1]
   sector_df$s_dist_ci_upr[sec_df_indx] <- ci_s_dist[2]
-  
+
   # Calculate probability of compound disturbance
   sector_df$ave_prob_c_dist[sec_df_indx] <- reef_df$prob_c_dist[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate confidence interval of recovery from single disturbance
   ci_c_dist <- reef_df$prob_c_dist[reef_df_indx] %>%
     as.numeric() %>%
     quantile(c(0.025, 0.975), na.rm = TRUE)
   sector_df$c_dist_ci_lwr[sec_df_indx] <- ci_c_dist[1]
   sector_df$c_dist_ci_upr[sec_df_indx] <- ci_c_dist[2]
-  
+
   # Calculate probability of impact from single disturbance
   sector_df$ave_prob_s_impact[sec_df_indx] <- reef_df$prob_s_impact[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate confidence interval of impact from single disturbance
   ci_s_impact <- reef_df$prob_s_impact[reef_df_indx] %>%
     as.numeric() %>%
     quantile(c(0.025, 0.975), na.rm = TRUE)
   sector_df$s_impact_ci_lwr[sec_df_indx] <- ci_s_impact[1]
   sector_df$s_impact_ci_upr[sec_df_indx] <- ci_s_impact[2]
-  
+
   # Calculate probability of impact from compound disturbance
   sector_df$ave_prob_c_impact[sec_df_indx] <- reef_df$prob_c_impact[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate confidence interval of impact from compound disturbance
   ci_c_impact <- reef_df$prob_c_impact[reef_df_indx] %>%
     as.numeric() %>%
     quantile(c(0.025, 0.975), na.rm = TRUE)
   sector_df$c_impact_ci_lwr[sec_df_indx] <- ci_c_impact[1]
   sector_df$c_impact_ci_upr[sec_df_indx] <- ci_c_impact[2]
-  
+
   # Calculate probability of recovery from single disturbance (unmanaged)
   sector_df$ave_prob_s_recov[sec_df_indx] <- reef_df$prob_s_recov[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate confidence interval of recovery from single disturbance
   ci_s_recov <- reef_df$prob_s_recov[reef_df_indx] %>%
     as.numeric() %>%
     quantile(c(0.025, 0.975), na.rm = TRUE)
   sector_df$s_recov_ci_lwr[sec_df_indx] <- ci_s_recov[1]
   sector_df$s_recov_ci_upr[sec_df_indx] <- ci_s_recov[2]
-  
+
   # Calculate probability of recovery from single disturbance (unmanaged)
   sector_df$ave_prob_c_recov[sec_df_indx] <- reef_df$prob_c_recov[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate confidence interval of recovery from single disturbance
   ci_c_recov <- reef_df$prob_c_recov[reef_df_indx] %>%
     as.numeric() %>%
     quantile(c(0.025, 0.975), na.rm = TRUE)
   sector_df$c_recov_ci_lwr[sec_df_indx] <- ci_c_recov[1]
   sector_df$c_recov_ci_upr[sec_df_indx] <- ci_c_recov[2]
-  
+
   # Calculate probability of recovery from single disturbance (managed)
   ave_r_s_mgd <- reef_df$prob_s_recov[reef_df_indx] %>%
     as.numeric() * (1 + mgmt_benefit) %>%
-    min(1)
+      min(1)
   sector_df$ave_r_s_mgd[sec_df_indx] <- mean(ave_r_s_mgd, na.rm = TRUE)
-  
+
   # Calculate probability of recovery from compound disturbance (managed)
   ave_r_c_mgd <- reef_df$prob_c_recov[reef_df_indx] %>%
     as.numeric() * (1 + mgmt_benefit) %>%
-    min(1)
+      min(1)
   sector_df$ave_r_c_mgd[sec_df_indx] <- mean(ave_r_c_mgd, na.rm = TRUE)
-  
+
   # Calculate probability of recovery from single disturbance (unmanaged)
   sector_df$ave_r_s_unmgd[sec_df_indx] <- reef_df$prob_s_recov[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate probability of recovery from compound disturbance (unmanaged)
   sector_df$ave_r_c_unmgd[sec_df_indx] <- reef_df$prob_c_recov[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate probability of recovery from single disturbance (unmanaged)
   sector_df$pr_recov_sing_unmgd[sec_df_indx] <- reef_df$pr_recov_sing_unmgd[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate probability of recovery from single disturbance (managed)
   sector_df$pr_recov_sing_mgd[sec_df_indx] <- reef_df$pr_recov_sing_mgd[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate probability of recovery from compound disturbance (unmanaged)
   sector_df$pr_recov_comp_unmgd[sec_df_indx] <- reef_df$pr_recov_comp_unmgd[reef_df_indx] %>%
     as.numeric() %>%
     mean(na.rm = TRUE)
-  
+
   # Calculate probability of recovery from compound disturbance (managed)
   sector_df$pr_recov_comp_mgd[sec_df_indx] <- reef_df$pr_recov_comp_mgd[reef_df_indx] %>%
     as.numeric() %>%
@@ -418,7 +418,7 @@ dumbbell_df <- melt(
 )
 xy <- st_coordinates(st_centroid(sector_boundaries$geometry))
 gbr_name_order <- sector_boundaries$AREA_DESCR[order(xy[, "X"], xy[, "Y"],
-                                                     decreasing = TRUE
+  decreasing = TRUE
 )]
 
 ggplot(
@@ -483,37 +483,19 @@ if (is_time_based) {
 #                   pr_recov_comp_unmgd, pr_recov_comp_mgd
 
 ################# SAMPLING #################
-num_samples <- 1000 # number of reefs to sample
-
-# Take num_samples rows randomly from sample_reefs
-sample_rf_pt_ids <- sample(unique(sample_reefs$point_id), num_samples)
-sample_reefs_df <- sample_reefs[which(sample_reefs$point_id %in% sample_rf_pt_ids), ] %>%
-  mutate(REEF_NAME = point_id)
-unique_sample_ids <- unique(sample_reefs_df$REEF_NAME)
-
-# Analyse reefs for single or compound disturbances
-# Returns event_counts, reef_df, overall_unknown_count
-sample_sc_list <- analyse_reefs(sample_reefs_df, unique_sample_ids, is_time_based, 
-                                recov_yrs, recov_th, cots_dist, cyc_dist, 
-                                dhw_dist, infer_baseline, epsilon, baseline_str)
-
-# Extract the list elements
-event_counts <- sample_sc_list[[1]]
-all_reefs_sf <- sample_sc_list[[2]]
-reef_df <- sample_sc_list[[3]]
-overall_unknown_count <- sample_sc_list[[4]]
-
-# sample_reefs_df <- sampler(reef_df, sector_boundaries, num_samples, is_time_based,
-#                            recov_th, recov_yrs, cots_dist, cyc_dist, dhw_dist) %>%
-#   suppressMessages()
+sample_reefs_df <- samplerv2(
+  reef_df, sector_boundaries, sample_reefs, num_samples,
+  is_time_based, recov_th, recov_yrs, cots_dist, cyc_dist,
+  dhw_dist
+)
 
 ############################################
 
 ########### SAMPLE OPTIMISATION ############
 
 sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit) # Calculate p for the n reefs
-sing_result <- optimiserSingle(sample_reefs_df, mgmt_constraint) # Single disturbance solution
-comp_result <- optimiserCompound(sample_reefs_df, mgmt_constraint) # Compound disturbance solution
+sing_result <- optimiser_single(sample_reefs_df, mgmt_constraint) # Single disturbance solution
+comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint) # Compound disturbance solution
 
 # PRINT RESULTS
 reef_s_to_manage_s <- which(get_solution(sing_result, y[i])$value == 1)
@@ -537,72 +519,74 @@ print(paste(
 
 ############### SIMULATIONS ################
 
-# Number of reefs must be divisible by number of sections in reef_df
-if (n %% length(unique(reef_df$management_region)) != 0) {
-  n <- floor(n / length(unique(reef_df$management_region))) *
-    length(unique(reef_df$management_region))
-}
-
 column_names <- c(
-  "geometry", "point_id", "prob_s_dist", "prob_c_dist", "prob_s_recov",
-  "prob_c_recov", "prob_s_recov_unmgd", "prob_s_recov_mgd", "prob_c_recov_unmgd",
-  "prob_c_recov_mgd", "pr_recov_sing_unmgd", "pr_recov_sing_mgd",
+  "sector", "point_loc", "point_id", "prob_s_dist", "prob_c_dist", "prob_s_impact",
+  "prob_c_impact", "prob_s_recov", "prob_c_recov", "r_single_unmgd", "r_single_mgd",
+  "r_comp_unmgd", "r_comp_mgd", "pr_recov_sing_unmgd", "pr_recov_sing_mgd",
   "pr_recov_comp_unmgd", "pr_recov_comp_mgd"
 )
 
 # Initialise:
-all_samples <- matrix(NA, nrow = n * n_sims, ncol = length(column_names)) %>%
+all_samples <- matrix(NA, nrow = num_samples * n_sims, ncol = length(column_names)) %>%
   data.frame() # df for all sample reef info
 colnames(all_samples) <- column_names
 all_samples <- all_samples %>%
   mutate(
-    isManageprob_s_dist = NA, # column in df for managed/not (single)
-    isManageprob_c_distound = NA
+    is_managed_single = NA, # column in df for managed/not (single)
+    is_managed_cumul = NA
   ) # column for managed/not (compound)
 
 # For each simulation,
 for (sim in 1:n_sims) {
-  # Sample n reefs from reef_df
-  sample_reefs_df <- sampler(
-    reef_df, sector_boundaries, n, is_time_based,
-    recov_th, recov_yrs, cots_dist, cyc_dist, dhw_dist
-  )
-  
+  # Sample num_samples reefs from reef_df
+  sample_reefs_df <- samplerv2(
+  reef_df, sector_boundaries, sample_reefs, num_samples,
+  is_time_based, recov_th, recov_yrs, cots_dist, cyc_dist,
+  dhw_dist
+)
+
   # Calculate p for the n reefs
   sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit)
-  
-  from_row <- (sim - 1) * n + 1
-  to_row <- sim * n
+
+  from_row <- (sim - 1) * num_samples + 1
+  to_row <- sim * num_samples
   all_samples[from_row:to_row, 1:length(column_names)] <- sample_reefs_df %>%
-    subset(select = c(
-      geometry, point_id, prob_s_dist, prob_c_dist, prob_s_recov,
-      prob_c_recov, prob_s_recov_unmgd, prob_s_recov_mgd, prob_c_recov_unmgd,
-      prob_c_recov_mgd, pr_recov_sing_unmgd, pr_recov_sing_mgd,
-      pr_recov_comp_unmgd, pr_recov_comp_mgd
-    ))
-  
+    subset(select = column_names)
+
   # Calculate single disturbance solution
-  sing_result <- optimiserSingle(sample_reefs_df, mgmt_constraint)
-  
+  sing_result <- optimiser_single(sample_reefs_df, mgmt_constraint)
+
   # Calculate compound disturbance solution
-  comp_result <- optimiserCompound(sample_reefs_df, mgmt_constraint)
-  
+  comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint)
+
   # Get the reefs to manage from solution
   sol_s <- get_solution(sing_result, y[i])$value
   sol_c <- get_solution(comp_result, y[i])$value
-  
-  all_samples[from_row:to_row, "isManageprob_s_dist"] <- sol_s
-  all_samples[from_row:to_row, "isManageprob_c_distound"] <- sol_c
+
+  all_samples[from_row:to_row, "is_managed_single"] <- sol_s
+  all_samples[from_row:to_row, "is_managed_cumul"] <- sol_c
 }
 
 # Visualise the reefs to manage
 all_samples <- st_as_sf(all_samples, crs = st_crs(sector_boundaries))
-single_vals <- st_transform(all_samples[all_samples$isManageprob_s_dist == 1, ],
-                            crs = st_crs(sector_boundaries)
+single_vals <- st_transform(all_samples[all_samples$is_managed_single == 1, ],
+  crs = st_crs(sector_boundaries)
 )
 
-x_single <- st_coordinates(single_vals$geometry)[, 1]
-y_single <- st_coordinates(single_vals$geometry)[, 2]
+# Create a faceted 2x2 plot of histograms of the probability of single disturbance for each management area
+ggplot(all_samples, aes(x = prob_s_dist)) +
+  geom_histogram(bins = 20) +
+  facet_wrap(~ sector, nrow = 2, ncol = 2) +
+  labs(x = "Probability of Single Disturbance", y = "Count")
+
+# Create a faceted 2x2 plot of histograms of the probability of compound disturbance for each management area
+ggplot(all_samples, aes(x = prob_c_dist)) +
+  geom_histogram(bins = 20) +
+  facet_wrap(~ sector, nrow = 2, ncol = 2) +
+  labs(x = "Probability of Compound Disturbance", y = "Count")
+
+x_single <- st_coordinates(single_vals$point_loc)[, 1]
+y_single <- st_coordinates(single_vals$point_loc)[, 2]
 
 single_plot <- ggplot() +
   geom_sf(data = sector_boundaries, lwd = 0.01) +
@@ -613,17 +597,17 @@ single_plot <- ggplot() +
     tag = "A"
   ) +
   geom_hex(single_vals,
-           mapping = aes(x_single, y_single),
-           binwidth = c(0.5, 0.5)
+    mapping = aes(x_single, y_single),
+    binwidth = c(0.5, 0.5)
   ) +
   theme(plot.tag = element_text())
 
-compound_vals <- st_transform(all_samples[all_samples$isManageprob_c_distound == 1, ],
-                              crs = st_crs(sector_boundaries)
+compound_vals <- st_transform(all_samples[all_samples$is_managed_cumul == 1, ],
+  crs = st_crs(sector_boundaries)
 )
 
-x_compound <- st_coordinates(compound_vals$geometry)[, 1]
-y_compound <- st_coordinates(compound_vals$geometry)[, 2]
+x_compound <- st_coordinates(compound_vals$point_loc)[, 1]
+y_compound <- st_coordinates(compound_vals$point_loc)[, 2]
 
 compound_plot <- ggplot() +
   geom_sf(data = sector_boundaries, lwd = 0.01) +
@@ -634,8 +618,8 @@ compound_plot <- ggplot() +
     tag = "B"
   ) +
   geom_hex(compound_vals,
-           mapping = aes(x_compound, y_compound),
-           binwidth = c(0.5, 0.5)
+    mapping = aes(x_compound, y_compound),
+    binwidth = c(0.5, 0.5)
   ) +
   theme(plot.tag = element_text())
 compound_plot
@@ -653,8 +637,8 @@ single_plot <- ggplot() +
   ) +
   theme(plot.tag = element_text()) +
   geom_hex(single_vals,
-           mapping = aes(x_single, y_single),
-           binwidth = c(0.5, 0.5)
+    mapping = aes(x_single, y_single),
+    binwidth = c(0.5, 0.5)
   ) +
   scale_fill_continuous(limits = c(
     min(p$count, q$count),
@@ -671,8 +655,8 @@ compound_plot <- ggplot() +
     tag = "B"
   ) +
   geom_hex(compound_vals,
-           mapping = aes(x_compound, y_compound),
-           binwidth = c(0.5, 0.5)
+    mapping = aes(x_compound, y_compound),
+    binwidth = c(0.5, 0.5)
   ) +
   scale_fill_continuous(limits = c(
     min(p$count, q$count),
@@ -681,9 +665,9 @@ compound_plot <- ggplot() +
   theme(plot.tag = element_text())
 
 ggarrange(single_plot, compound_plot,
-          ncol = 2, nrow = 1,
-          common.legend = TRUE,
-          legend = "right"
+  ncol = 2, nrow = 1,
+  common.legend = TRUE,
+  legend = "right"
 )
 
 if (is_time_based) {
