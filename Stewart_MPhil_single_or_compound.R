@@ -20,179 +20,179 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
     # Get indices of disturbance years
     dist_indices <- which(obs_by_reef$is_disturbed)
 
-    if (dist_indices[1] == 1) {
+    # Set first baseline as the max coral value before first disturbance
+    max_pre_dist_cover <- ifelse(dist_indices[1] == 1,
+      NA,
+      max(obs_by_reef$COVER[1:dist_indices[1] - 1])
+    )
 
-    } else {
-      # Set first baseline as the max coral value before first disturbance
-      max_pre_dist_cover <- max(obs_by_reef$COVER[1:dist_indices[1] - 1])
+    # If coral cover at first disturbance is below max_pre_dist_cover*(1 - epsilon)
+    if (!is.na(max_pre_dist_cover) &&
+    obs_by_reef$COVER[dist_indices[1]] < max_pre_dist_cover * (1 - epsilon)) {
+      # Then we have a reef with a baseline
+      baseline <- max_pre_dist_cover * (1 - epsilon)
+    } else if (infer_baseline) {
+      # Find local maxima within the epsilon range
+      local_maxima <- findpeaks(obs_by_reef$COVER, nups = 1, ndowns = 1)
+      maxima_values <- local_maxima[, 1]
 
-      # If coral cover at first disturbance is below max_pre_dist_cover*(1 - epsilon)
-      if (obs_by_reef$COVER[dist_indices[1]] < max_pre_dist_cover * (1 - epsilon)) {
-        # Then we have a reef with a baseline
-        baseline <- max_pre_dist_cover * (1 - epsilon)
-      } else if (infer_baseline) {
-        # Find local maxima within the epsilon range
-        local_maxima <- findpeaks(obs_by_reef$COVER, nups = 1, ndowns = 1)
-        maxima_values <- local_maxima[, 1]
-
-        if (baseline_str == "min") {
-          # Calculate the minimum of the local maxima
-          baseline <- ifelse(length(local_maxima) > 0,
-            min(maxima_values),
-            min(obs_by_reef$COVER)
-          )
-        } else if (baseline_str == "mean") {
-          # Calculate the average of the local maxima
-          baseline <- ifelse(length(local_maxima) > 0,
-            mean(maxima_values),
-            mean(obs_by_reef$COVER)
-          )
-        } else if (baseline_str == "max") {
-          # Calculate the max of the local maxima
-          baseline <- ifelse(length(local_maxima) > 0,
-            max(maxima_values),
-            max(obs_by_reef$COVER)
-          )
-        }
-      } else {
-        # Then this reef does not have a baseline
-        baseline <- NA
+      if (baseline_str == "min") {
+        # Calculate the minimum of the local maxima
+        baseline <- ifelse(length(local_maxima) > 0,
+          min(maxima_values),
+          min(obs_by_reef$COVER)
+        )
+      } else if (baseline_str == "mean") {
+        # Calculate the average of the local maxima
+        baseline <- ifelse(length(local_maxima) > 0,
+          mean(maxima_values),
+          mean(obs_by_reef$COVER)
+        )
+      } else if (baseline_str == "max") {
+        # Calculate the max of the local maxima
+        baseline <- ifelse(length(local_maxima) > 0,
+          max(maxima_values),
+          max(obs_by_reef$COVER)
+        )
       }
-      # Initialise skip variable
-      skip_next <- 0
-      if (!is.na(baseline)) {
-        # For each disturbance
-        # dist_index <- dist_indices[1] # for testing
-        for (dist_index in dist_indices) {
-          # Check if there's a new baseline
-          if (max(obs_by_reef$COVER[1:dist_index - 1]) > max_pre_dist_cover) {
-            max_pre_dist_cover <- max(obs_by_reef$COVER[1:dist_index - 1])
-            baseline <- max_pre_dist_cover * (1 - epsilon)
-          }
+    } else {
+      # Then this reef does not have a baseline
+      baseline <- NA
+    }
+    # Initialise skip variable
+    skip_next <- 0
+    if (!is.na(baseline)) {
+      # For each disturbance
+      # dist_index <- dist_indices[1] # for testing
+      for (dist_index in dist_indices) {
+        # Check if there's a new baseline
+        if (max(obs_by_reef$COVER[1:dist_index - 1]) > max_pre_dist_cover) {
+          max_pre_dist_cover <- max(obs_by_reef$COVER[1:dist_index - 1])
+          baseline <- max_pre_dist_cover * (1 - epsilon)
+        }
 
-          # If we need to skip this disturbance as it was already counted in the last one
-          if (skip_next > 0) {
-            # Take one from the skip variable and move on
-            skip_next <- skip_next - 1
-          } else {
-            # Add disturbance type
-            obs_by_reef$dist_type[dist_index] <- paste0(
-              dist_names[c(
-                obs_by_reef$COTS_value[dist_index] >= cots_dist,
-                obs_by_reef$Hs4MW_value[dist_index] >= cyc_dist,
-                obs_by_reef$DHW_value[dist_index] >= dhw_dist
-              )],
-              collapse = ", "
-            )
-            # If time based
-            if (is_time_based) {
-              # If there are any disturbances between this one and recov_yrs from now
-              current_yr <- obs_by_reef$YEAR[dist_index]
-              if (any(obs_by_reef$is_disturbed[obs_by_reef$YEAR > current_yr &
+        # If we need to skip this disturbance as it was already counted in the last one
+        if (skip_next > 0) {
+          # Take one from the skip variable and move on
+          skip_next <- skip_next - 1
+        } else {
+          # Add disturbance type
+          obs_by_reef$dist_type[dist_index] <- paste0(
+            dist_names[c(
+              obs_by_reef$COTS_value[dist_index] >= cots_dist,
+              obs_by_reef$Hs4MW_value[dist_index] >= cyc_dist,
+              obs_by_reef$DHW_value[dist_index] >= dhw_dist
+            )],
+            collapse = ", "
+          )
+          # If time based
+          if (is_time_based) {
+            # If there are any disturbances between this one and recov_yrs from now
+            current_yr <- obs_by_reef$YEAR[dist_index]
+            if (any(obs_by_reef$is_disturbed[obs_by_reef$YEAR > current_yr &
+              obs_by_reef$YEAR < current_yr + recov_yrs])) {
+              # Get a list of those disturbance index/es
+              next_dist_s <- which(obs_by_reef$is_disturbed[obs_by_reef$YEAR > current_yr &
+                obs_by_reef$YEAR < current_yr + recov_yrs]) + dist_index
+              skip_next <- length(next_dist_s)
+
+              # While there are still disturbances within recov_yrs of the final dist in compound cluster
+              final_dist_index <- next_dist_s[length(next_dist_s)]
+              current_yr <- obs_by_reef$YEAR[final_dist_index]
+              while (any(obs_by_reef$is_disturbed[obs_by_reef$YEAR > current_yr &
                 obs_by_reef$YEAR < current_yr + recov_yrs])) {
                 # Get a list of those disturbance index/es
                 next_dist_s <- which(obs_by_reef$is_disturbed[obs_by_reef$YEAR > current_yr &
-                  obs_by_reef$YEAR < current_yr + recov_yrs]) + dist_index
-                skip_next <- length(next_dist_s)
-
-                # While there are still disturbances within recov_yrs of the final dist in compound cluster
+                  obs_by_reef$YEAR < current_yr + recov_yrs]) + final_dist_index
+                skip_next <- skip_next + length(next_dist_s)
                 final_dist_index <- next_dist_s[length(next_dist_s)]
                 current_yr <- obs_by_reef$YEAR[final_dist_index]
-                while (any(obs_by_reef$is_disturbed[obs_by_reef$YEAR > current_yr &
-                  obs_by_reef$YEAR < current_yr + recov_yrs])) {
-                  # Get a list of those disturbance index/es
-                  next_dist_s <- which(obs_by_reef$is_disturbed[obs_by_reef$YEAR > current_yr &
-                    obs_by_reef$YEAR < current_yr + recov_yrs]) + final_dist_index
-                  skip_next <- skip_next + length(next_dist_s)
-                  final_dist_index <- next_dist_s[length(next_dist_s)]
-                  current_yr <- obs_by_reef$YEAR[final_dist_index]
-                }
-
-                # Recovery year is the next disturbance year + recovery time
-                obs_by_reef$recov_year[dist_index] <- max(obs_by_reef$YEAR[next_dist_s]) + recov_yrs
-              } else {
-                # Assume recovery year is the disturbance year + recovery time
-                obs_by_reef$recov_year[dist_index] <- obs_by_reef$YEAR[dist_index] + recov_yrs
               }
-            } else { # If recovery based
-              # Determine if reef is impacted & log in df
-              obs_by_reef$is_impacted[dist_index] <- obs_by_reef$COVER[dist_index] < baseline
 
-              # If it is impacted, find recovery year
-              if (obs_by_reef$is_impacted[dist_index]) {
-                # If we're in the last row, we have no post obs
-                if (dist_index == nrow(obs_by_reef)) {
-                  # Set recovery year to unknown
-                  obs_by_reef$recov_year[dist_index] <- "Unknown - no post obs"
-                } else {
-                  # Find next observation with at least max_pre_dist_cover*recov_th
-                  post_rec_index <- which(obs_by_reef$COVER[dist_index:nrow(obs_by_reef)] > max_pre_dist_cover * recov_th)[1] + dist_index - 1
-                  # If there are no obs with at least recov_th*max_pre_dist_cover
-                  if (is.na(post_rec_index)) {
-                    obs_by_reef$recov_year[dist_index] <- "Unknown - no post-disturbance growth"
+              # Recovery year is the next disturbance year + recovery time
+              obs_by_reef$recov_year[dist_index] <- max(obs_by_reef$YEAR[next_dist_s]) + recov_yrs
+            } else {
+              # Assume recovery year is the disturbance year + recovery time
+              obs_by_reef$recov_year[dist_index] <- obs_by_reef$YEAR[dist_index] + recov_yrs
+            }
+          } else { # If recovery based
+            # Determine if reef is impacted & log in df
+            obs_by_reef$is_impacted[dist_index] <- obs_by_reef$COVER[dist_index] < baseline
 
-                    # If there are any disturbances afterwards
-                    if (any(obs_by_reef$is_disturbed[(dist_index + 1):nrow(obs_by_reef)])) {
-                      # Pair these disturbances with the first instance and make it compound
-                      next_dists <- which(obs_by_reef$is_disturbed[(dist_index + 1):nrow(obs_by_reef)]) + dist_index
-                      dist_type <- obs_by_reef$dist_type[dist_index]
-                      for (event in next_dists) {
-                        event_disturb <- dist_names[c(
-                          obs_by_reef$COTS_value[event] >= cots_dist,
-                          obs_by_reef$Hs4MW_value[event] >= cyc_dist,
-                          obs_by_reef$DHW_value[event] >= dhw_dist
-                        )]
-                        if (length(event_disturb > 1)) {
-                          event_disturb <- paste(event_disturb, collapse = ", ")
-                        }
-                        dist_type <- paste0(
-                          c(
-                            dist_type,
-                            event_disturb
-                          ),
-                          collapse = ", "
-                        )
-                        obs_by_reef$dist_type[event] <- NA
-                        obs_by_reef$recov_year[event] <- NA
+            # If it is impacted, find recovery year
+            if (obs_by_reef$is_impacted[dist_index]) {
+              # If we're in the last row, we have no post obs
+              if (dist_index == nrow(obs_by_reef)) {
+                # Set recovery year to unknown
+                obs_by_reef$recov_year[dist_index] <- "Unknown - no post obs"
+              } else {
+                # Find next observation with at least max_pre_dist_cover*recov_th
+                post_rec_index <- which(obs_by_reef$COVER[dist_index:nrow(obs_by_reef)] > max_pre_dist_cover * recov_th)[1] + dist_index - 1
+                # If there are no obs with at least recov_th*max_pre_dist_cover
+                if (is.na(post_rec_index)) {
+                  obs_by_reef$recov_year[dist_index] <- "Unknown - no post-disturbance growth"
+
+                  # If there are any disturbances afterwards
+                  if (any(obs_by_reef$is_disturbed[(dist_index + 1):nrow(obs_by_reef)])) {
+                    # Pair these disturbances with the first instance and make it compound
+                    next_dists <- which(obs_by_reef$is_disturbed[(dist_index + 1):nrow(obs_by_reef)]) + dist_index
+                    dist_type <- obs_by_reef$dist_type[dist_index]
+                    for (event in next_dists) {
+                      event_disturb <- dist_names[c(
+                        obs_by_reef$COTS_value[event] >= cots_dist,
+                        obs_by_reef$Hs4MW_value[event] >= cyc_dist,
+                        obs_by_reef$DHW_value[event] >= dhw_dist
+                      )]
+                      if (length(event_disturb > 1)) {
+                        event_disturb <- paste(event_disturb, collapse = ", ")
                       }
-                      obs_by_reef$dist_type[dist_index] <- dist_type
-
-                      # Make sure those dists are skipped
-                      skip_next <- length(next_dists)
+                      dist_type <- paste0(
+                        c(
+                          dist_type,
+                          event_disturb
+                        ),
+                        collapse = ", "
+                      )
+                      obs_by_reef$dist_type[event] <- NA
+                      obs_by_reef$recov_year[event] <- NA
                     }
-                  } else { # If there are obs with at least baseline
-                    # If there are any disturbances between disturbance and recovery
-                    if (dist_index + 1 <= post_rec_index - 1 &&
-                      any(obs_by_reef$is_disturbed[(dist_index + 1):(post_rec_index - 1)])) {
-                      # Pair these disturbances with the first instance and make it compound
-                      next_dists <- which(obs_by_reef$is_disturbed[(dist_index + 1):(post_rec_index - 1)]) + dist_index
-                      dist_type <- obs_by_reef$dist_type[dist_index]
-                      for (event in next_dists) {
-                        event_disturb <- dist_names[c(
-                          obs_by_reef$COTS_value[event] >= cots_dist,
-                          obs_by_reef$Hs4MW_value[event] >= cyc_dist,
-                          obs_by_reef$DHW_value[event] >= dhw_dist
-                        )]
-                        if (length(event_disturb > 1)) {
-                          event_disturb <- paste(event_disturb, collapse = ", ")
-                        }
-                        dist_type <- paste0(
-                          c(
-                            dist_type,
-                            event_disturb
-                          ),
-                          collapse = ", "
-                        )
-                        obs_by_reef$dist_type[event] <- NA
-                        obs_by_reef$recov_year[event] <- NA
-                      }
-                      obs_by_reef$dist_type[dist_index] <- dist_type
+                    obs_by_reef$dist_type[dist_index] <- dist_type
 
-                      # Make sure those dists are skipped
-                      skip_next <- length(next_dists)
-                    }
-                    obs_by_reef$recov_year[dist_index] <- obs_by_reef$YEAR[post_rec_index]
+                    # Make sure those dists are skipped
+                    skip_next <- length(next_dists)
                   }
+                } else { # If there are obs with at least baseline
+                  # If there are any disturbances between disturbance and recovery
+                  if (dist_index + 1 <= post_rec_index - 1 &&
+                    any(obs_by_reef$is_disturbed[(dist_index + 1):(post_rec_index - 1)])) {
+                    # Pair these disturbances with the first instance and make it compound
+                    next_dists <- which(obs_by_reef$is_disturbed[(dist_index + 1):(post_rec_index - 1)]) + dist_index
+                    dist_type <- obs_by_reef$dist_type[dist_index]
+                    for (event in next_dists) {
+                      event_disturb <- dist_names[c(
+                        obs_by_reef$COTS_value[event] >= cots_dist,
+                        obs_by_reef$Hs4MW_value[event] >= cyc_dist,
+                        obs_by_reef$DHW_value[event] >= dhw_dist
+                      )]
+                      if (length(event_disturb > 1)) {
+                        event_disturb <- paste(event_disturb, collapse = ", ")
+                      }
+                      dist_type <- paste0(
+                        c(
+                          dist_type,
+                          event_disturb
+                        ),
+                        collapse = ", "
+                      )
+                      obs_by_reef$dist_type[event] <- NA
+                      obs_by_reef$recov_year[event] <- NA
+                    }
+                    obs_by_reef$dist_type[dist_index] <- dist_type
+
+                    # Make sure those dists are skipped
+                    skip_next <- length(next_dists)
+                  }
+                  obs_by_reef$recov_year[dist_index] <- obs_by_reef$YEAR[post_rec_index]
                 }
               }
             }

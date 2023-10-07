@@ -40,6 +40,9 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
     sample_reefs_all_yrs[, c("point_id", "sector", "point_loc")]
   ) %>%
     mutate(
+      num_dist = NA,
+      num_s_dist = NA,
+      num_c_dist = NA,
       d_tot = NA,
       prob_s_dist = NA,
       prob_c_dist = NA,
@@ -183,18 +186,24 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
 
       # If there is a disturbance that year
       if (reef_obs$is_disturbed[dist]) {
+        # If it is the final disturbance, it must be single
+        if (dist == nrow(reef_obs)) {
+          reef_obs$single_or_compound[dist] <- "Single"
+          next
+        }
+
         # Is there another disturbance at the reef within 1/r_single years?
         if (sum(
           reef_obs$is_disturbed[(dist + 1):nrow(reef_obs)] &
             reef_obs$year[(dist + 1):nrow(reef_obs)] <=
-              reef_obs$year[dist] + 1 / reef_obs$prob_s_recov[dist],
+              reef_obs$year[dist] + 1 / as.numeric(sample_reefs_df$prob_s_recov[reef]),
           na.rm = TRUE
         ) > 0) {
           reef_obs$single_or_compound[dist] <- "Compound"
           skip_next <- sum(
             reef_obs$is_disturbed[(dist + 1):nrow(reef_obs)] &
               reef_obs$year[(dist + 1):nrow(reef_obs)] <=
-                reef_obs$year[dist] + 1 / reef_obs$prob_c_recov[dist],
+                reef_obs$year[dist] + 1 / as.numeric(sample_reefs_df$prob_c_recov[reef]),
             na.rm = TRUE
           )
 
@@ -224,6 +233,26 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
           reef_obs$single_or_compound == "Compound",
         na.rm = TRUE
       ) / nrow(reef_obs)
+
+      # Calculate number of disturbances at the reef
+      sample_reefs_df$num_dist[reef] <- sum(
+        reef_obs$is_disturbed,
+        na.rm = TRUE
+      )
+
+      # Calculate the number of single disturbances at the reef
+      sample_reefs_df$num_s_dist[reef] <- sum(
+        reef_obs$is_disturbed &
+          reef_obs$single_or_compound == "Single",
+        na.rm = TRUE
+      )
+
+      # Calculate the number of cumulative disturbances at the reef
+      sample_reefs_df$num_c_dist[reef] <- sum(
+        reef_obs$is_disturbed &
+          reef_obs$single_or_compound == "Compound",
+        na.rm = TRUE
+      )
     }
   }
 

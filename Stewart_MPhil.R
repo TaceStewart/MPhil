@@ -27,6 +27,9 @@ library(ROI.plugin.glpk) # GNU Linear Programming Kit
 library(ROI) # R Optimization Infrastructure
 library(ggplot2) # creates plots
 library(latex2exp) # LaTeX for ggplot
+library(patchwork)
+library(ggbump) # Delete in not using for opt vis 2
+library(GGally)
 
 # Load disturbance and recovery calculators
 source("Stewart_MPhil_single_or_compound.R")
@@ -96,8 +99,8 @@ recov_th <- 0.75
 # Management benefit (currently % added to mgd reef recovery rate)
 mgmt_benefit <- 0.1
 
-# Management constraint (usually 20% of number of reefs in system)
-mgmt_constraint <- 0.20
+# Management constraint (base: 30% of number of reefs in system)
+mgmt_constraint <- 0.30
 
 ### Sensitivity values ###
 sens_recov_yrs <- c(1, 2, 5, 10, 15)
@@ -112,7 +115,7 @@ run_simulations <- TRUE
 n_sims <- 100
 
 # Set number of sample reefs, num_samples
-num_samples <- 1000
+num_samples <- 3000
 ############################################
 
 ####### INITIALISE VARIABLES AND DFS #######
@@ -475,14 +478,8 @@ if (is_time_based) {
 }
 ############################################
 
-# To Do:
-#   make raincloud vis for impact of compounding on prob recovered state
-#   Incorporate sample df:
-#   Needs calcs for r_single_mgd, r_single_unmgd, r_comp_unmgd, r_comp_mgd,
-#                   pr_recov_sing_unmgd, pr_recov_sing_mgd,
-#                   pr_recov_comp_unmgd, pr_recov_comp_mgd
-
 ################# SAMPLING #################
+
 sample_reefs_df <- samplerv2(
   reef_df, sector_boundaries, sample_reefs, num_samples,
   is_time_based, recov_th, recov_yrs, cots_dist, cyc_dist,
@@ -497,24 +494,259 @@ sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit) # Calculate p for
 sing_result <- optimiser_single(sample_reefs_df, mgmt_constraint) # Single disturbance solution
 comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint) # Compound disturbance solution
 
-# PRINT RESULTS
-reef_s_to_manage_s <- which(get_solution(sing_result, y[i])$value == 1)
-prcvd_exp_recov_s <- sum(sample_reefs_df$pr_recov_sing_mgd[reef_s_to_manage_s]) +
-  sum(sample_reefs_df$pr_recov_sing_unmgd[-c(reef_s_to_manage_s)]) # Perceived reefs in recov state
-actual_exp_recov_s <- sum(sample_reefs_df$pr_recov_comp_mgd[reef_s_to_manage_s]) +
-  sum(sample_reefs_df$pr_recov_comp_unmgd[-c(reef_s_to_manage_s)]) # Actual reefs in recov state
-reef_s_to_manage_c <- which(get_solution(comp_result, y[i])$value == 1)
-exp_recov_c <- sum(sample_reefs_df$pr_recov_comp_mgd[reef_s_to_manage_c]) +
-  sum(sample_reefs_df$pr_recov_comp_unmgd[-c(reef_s_to_manage_c)]) # Expected reefs in recov state
-print(paste(
-  "When only considering single disturbances, it is recommended to manage reef/s",
-  paste(reef_s_to_manage_s, collapse = ", "), "for a perceived",
-  prcvd_exp_recov_s, "reefs in a recovered state, but an actual",
-  actual_exp_recov_s, "reefs in a recovered state.",
-  "In the compound disturbance scenario, it is recommended to manage reef/s",
-  paste(reef_s_to_manage_c, collapse = ", "), "for an expected",
-  exp_recov_c, "reefs in a recovered state."
-))
+# Get the reefs to manage from solutions
+sample_reefs_df$is_managed_single <- get_solution(sing_result, y[i])$value
+sample_reefs_df$is_managed_cumul <- get_solution(comp_result, y[i])$value
+
+# Transform to sf
+sample_reefs_df <- st_as_sf(sample_reefs_df, crs = st_crs(sector_boundaries))
+
+# Get x and y coordinates
+sample_reefs_df <- sample_reefs_df %>%
+  mutate(
+    x = st_coordinates(point_loc)[, "X"],
+    y = st_coordinates(point_loc)[, "Y"]
+  )
+
+# Make another column for four types of results
+for (i in seq_len(nrow(sample_reefs_df))) {
+  if (sample_reefs_df$is_managed_single[i] == 0 && sample_reefs_df$is_managed_cumul[i] == 0) {
+    sample_reefs_df$scenario_managed[i] <- "Never selected for management"
+  } else if (sample_reefs_df$is_managed_single[i] == 1 && sample_reefs_df$is_managed_cumul[i] == 0) {
+    sample_reefs_df$scenario_managed[i] <- "Single Only"
+  } else if (sample_reefs_df$is_managed_single[i] == 0 && sample_reefs_df$is_managed_cumul[i] == 1) {
+    sample_reefs_df$scenario_managed[i] <- "Single and Cumulative"
+  } else if (sample_reefs_df$is_managed_single[i] == 1 && sample_reefs_df$is_managed_cumul[i] == 1) {
+    sample_reefs_df$scenario_managed[i] <- "Both"
+  }
+}
+
+cols <- c("Single Only" = "steelblue1", 
+          "Single and Cumulative " = "steelblue4",
+          "Both" = "#945cee",
+          "Neither" = "grey")
+
+# Make visualisation 1: Map of management regions
+# Sample reefs that are never chosen to manage in either scenario are grey circles
+# Sample reefs that are chosen to manage in single scenario are steel_blue1 coloured circles
+# Sample reefs that are chosen to manage in compound scenario are steel_blue4 coloured circles
+# Sample reefs that are chosen to manage in both scenarios are steel_blue2 coloured circles
+opt_vis_1_1 <- ggplot() +
+  geom_sf(data = sector_boundaries, lwd = 0.01) +
+  theme_classic() +
+  geom_point(
+    data = sample_reefs_df,
+    aes(x = x, y = y, color = scenario_managed),
+    size = 0.5,
+    alpha = 0.75
+  ) +
+  labs(
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  scale_color_manual(
+    name = "Scenario Managed",
+    values = cols) +
+  theme(
+    legend.position = c(.025, .025),
+    legend.background = element_blank(),
+    legend.box.background = element_rect(colour = "azure3"),
+    legend.justification = c("left", "bottom"),
+    legend.box.just = "left",
+    legend.margin = margin(5, 10, 5, 5)
+  )
+
+# Create df for subsetted plot
+opt_vis_1_df <- data.frame(
+  sing_or_cumul = c("Single Only", "Single Only", "Single and Cumulative"),
+  variable = c("Single Only - Perceived", "Single Only - Actual", "Single and Cumulative"),
+  value = c(
+    sum(sample_reefs_df$pr_recov_sing_mgd[sample_reefs_df$is_managed_single]) +
+      sum(sample_reefs_df$pr_recov_sing_unmgd[1 - sample_reefs_df$is_managed_single]),
+    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_single]) +
+      sum(sample_reefs_df$pr_recov_comp_unmgd[1 - sample_reefs_df$is_managed_single]),
+    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_cumul]) +
+      sum(sample_reefs_df$pr_recov_comp_unmgd[1 - sample_reefs_df$is_managed_cumul])
+  )
+)
+
+# Add inset plot to vis 1: simple bar chart in the bottom left corner
+# of the expected number of reefs in a recovered state for single and cumulative scenario
+# with a greyed out bar for the perceived number of reefs in a recovered state in single scenario
+opt_vis_1_2 <- ggplot() +
+  geom_bar(
+    data = opt_vis_1_df,
+    aes(
+      x = sing_or_cumul,
+      y = value,
+      fill = variable
+    ),
+    stat = "identity",
+    position = position_identity()
+  ) +
+  theme_classic() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 6),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_text(size = 8),
+    plot.margin = unit(c(-1, -1, -1, -1), "cm"),
+    legend.position = "bottom",
+    legend.text = element_text(size = 6),
+    legend.box.margin = margin(0, 0, 0, 0),
+    legend.box.spacing = unit(0, "cm")
+  ) +
+  scale_fill_manual(
+    name = "",
+    labels = c(
+      "Single and\nCumulative",
+      "Single Only\n- Actual",
+      "Single Only\n- Perceived"
+    ),
+    values = c("steelblue4", "steelblue1", "grey")
+  ) +
+  labs(
+    x = "Disturbances Considered",
+    y = "Expected Number of\nReefs Considered Recovered"
+  )
+opt_vis_1_1 + inset_element(opt_vis_1_2, 0.5, 0.6, 0.975, 0.975)
+
+# Save plot
+if (is_time_based) {
+  ggsave(
+    paste0(
+      out_path, "/OptVis1_TimeBased",
+      recov_yrs, "yr", mgmt_benefit, "mgmt.png"
+    ),
+    plot = last_plot(), width = 5, height = 5
+  )
+} else {
+  ggsave(
+    paste0(
+      out_path, "/OptVis1_RecovBased",
+      recov_th, "th", mgmt_benefit, "mgmt.png"
+    ),
+    plot = last_plot(), width = 5, height = 5
+  )
+}
+
+# Alter sample_reefs_df to have column of disfference in probability of being in a recovered state
+# when managed/not
+sample_reefs_df <- sample_reefs_df %>%
+  mutate(
+    diff_prob_recov_s = pr_recov_sing_mgd - pr_recov_sing_unmgd,
+    diff_prob_recov_c = pr_recov_comp_mgd - pr_recov_comp_unmgd
+  )
+
+# Create dataframe for visualisation 2:
+# Point ID | diff_prob_recov_s | diff_prob_recov_c | position_s | position_c | sector
+opt_vis_2_df <- data.frame(
+  point_id = sample_reefs_df$point_id,
+  diff_prob_recov_s = sample_reefs_df$diff_prob_recov_s,
+  diff_prob_recov_c = sample_reefs_df$diff_prob_recov_c,
+  position_s = NA,
+  position_c = NA,
+  sector = sample_reefs_df$sector
+)
+opt_vis_2_df$position_s <- rank(opt_vis_2_df$diff_prob_recov_s, ties.method = "random")
+opt_vis_2_df$position_c <- rank(opt_vis_2_df$diff_prob_recov_c, ties.method = "random")
+
+# Melt the dataframe so that there is one position column and another column for the scenario
+opt_vis_2_df <- melt(
+  opt_vis_2_df,
+  id.vars = c("point_id", "sector"),
+  measure.vars = c("position_s", "position_c"),
+  variable.name = "scenario",
+  value.name = "position"
+)
+opt_vis_2_df <- opt_vis_2_df %>%
+  mutate(
+    scenario_num = ifelse(scenario == "position_s", 1, 2)
+  )
+
+# Make visualisation 2: Bump Chart of the prioritisation of reefs in both management scenarios
+# Reefs are ordered by the difference in probability of being in a recovered state when managed/not
+opt_vis_2 <- ggplot(opt_vis_2_df, aes(x = scenario_num, 
+                         y = as.numeric(position), 
+                         color = sector,
+                         group = point_id)) +
+  geom_bump(linewidth = 1,
+            alpha = 0.5) +
+  geom_point(size = 1) +
+  theme_classic() +
+  theme(
+    legend.position = "bottom",
+    legend.background = element_blank(),
+    legend.box.background = element_rect(colour = "azure3"),
+    legend.justification = c("left", "bottom"),
+    legend.box.just = "left",
+    legend.margin = margin(5, 10, 5, 5)
+  ) +
+  labs(
+    x = "Management Scenario",
+    y = "Reef Priority",
+    color = "GBRMPA Management Area"
+  )
+
+# Save plot
+if (is_time_based) {
+  ggsave(
+    paste0(
+      out_path, "/OptVis2_TimeBased",
+      recov_yrs, "yr", mgmt_benefit, "mgmt.png"
+    ),
+    plot = opt_vis_2, width = 5, height = 6
+  )
+} else {
+  ggsave(
+    paste0(
+      out_path, "/OptVis2_RecovBased",
+      recov_th, "th", mgmt_benefit, "mgmt.png"
+    ),
+    plot = opt_vis_2, width = 5, height = 6
+  )
+}
+
+# Make visualisation 3: Density of the number of disturbances, split by managed/not managed
+# and by management scenario
+opt_vis_3 <- ggplot(sample_reefs_df, 
+                    aes(x = num_dist, 
+                    fill = scenario_managed)) +
+  geom_density(alpha = 0.5) +
+  theme_classic() +
+  theme(
+    legend.position = "bottom",
+    legend.background = element_blank(),
+    legend.justification = c("center", "bottom")
+  ) +
+  scale_color_manual(values = cols) +
+  labs(
+    x = "Number of Disturbances",
+    y = "Density",
+    fill = "Scenario Managed"
+  )
+
+# Save plot
+if (is_time_based) {
+  ggsave(
+    paste0(
+      out_path, "/OptVis3_TimeBased",
+      recov_yrs, "yr", mgmt_benefit, "mgmt.png"
+    ),
+    plot = opt_vis_3, width = 5, height = 5
+  )
+} else {
+  ggsave(
+    paste0(
+      out_path, "/OptVis3_RecovBased",
+      recov_th, "th", mgmt_benefit, "mgmt.png"
+    ),
+    plot = opt_vis_3, width = 5, height = 5
+  )
+}
+
 ############################################
 
 ############### SIMULATIONS ################
@@ -540,10 +772,10 @@ all_samples <- all_samples %>%
 for (sim in 1:n_sims) {
   # Sample num_samples reefs from reef_df
   sample_reefs_df <- samplerv2(
-  reef_df, sector_boundaries, sample_reefs, num_samples,
-  is_time_based, recov_th, recov_yrs, cots_dist, cyc_dist,
-  dhw_dist
-)
+    reef_df, sector_boundaries, sample_reefs, num_samples,
+    is_time_based, recov_th, recov_yrs, cots_dist, cyc_dist,
+    dhw_dist
+  )
 
   # Calculate p for the n reefs
   sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit)
@@ -576,14 +808,18 @@ single_vals <- st_transform(all_samples[all_samples$is_managed_single == 1, ],
 # Create a faceted 2x2 plot of histograms of the probability of single disturbance for each management area
 ggplot(all_samples, aes(x = prob_s_dist)) +
   geom_histogram(bins = 20) +
-  facet_wrap(~ sector, nrow = 2, ncol = 2) +
-  labs(x = "Probability of Single Disturbance", y = "Count")
+  facet_wrap(~sector, nrow = 2, ncol = 2) +
+  labs(x = "Probability of Single Disturbance", y = "Count") +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 12000, 500))
 
 # Create a faceted 2x2 plot of histograms of the probability of compound disturbance for each management area
 ggplot(all_samples, aes(x = prob_c_dist)) +
   geom_histogram(bins = 20) +
-  facet_wrap(~ sector, nrow = 2, ncol = 2) +
-  labs(x = "Probability of Compound Disturbance", y = "Count")
+  facet_wrap(~sector, nrow = 2, ncol = 2) +
+  labs(x = "Probability of Compound Disturbance", y = "Count") +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 12000, 500))
 
 x_single <- st_coordinates(single_vals$point_loc)[, 1]
 y_single <- st_coordinates(single_vals$point_loc)[, 2]
@@ -644,7 +880,7 @@ single_plot <- ggplot() +
     min(p$count, q$count),
     max(p$count, q$count)
   )) +
-  labs(fill = "Number of \nManaged Reefs")
+  labs(fill = "Average Number of \nManaged Reefs")
 
 compound_plot <- ggplot() +
   geom_sf(data = sector_boundaries, lwd = 0.01) +
@@ -664,7 +900,7 @@ compound_plot <- ggplot() +
   )) +
   theme(plot.tag = element_text())
 
-ggarrange(single_plot, compound_plot,
+opt_vis_4 <- ggarrange(single_plot, compound_plot,
   ncol = 2, nrow = 1,
   common.legend = TRUE,
   legend = "right"
@@ -673,21 +909,19 @@ ggarrange(single_plot, compound_plot,
 if (is_time_based) {
   ggsave(
     paste0(
-      out_path, "/",
-      n_sims, "Sim_Hexmap_TimeBased",
+      out_path, "/OptVis4_TimeBased",
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
-    plot = last_plot(),
+    plot = opt_vis_4,
     width = 8, height = 5
   )
 } else {
   ggsave(
     paste0(
-      out_path, "/",
-      n_sims, "Sim_Hexmap_RecovBased",
+      out_path, "/OptVis4_RecovBased",
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
-    plot = last_plot(),
+    plot = opt_vis_4,
     width = 8, height = 5
   )
 }
