@@ -100,7 +100,7 @@ recov_th <- 0.75
 mgmt_benefit <- 0.1
 
 # Management constraint (base: 30% of number of reefs in system)
-mgmt_constraint <- 0.30
+mgmt_constraint <- 0.20
 
 ### Sensitivity values ###
 sens_recov_yrs <- c(1, 2, 5, 10, 15)
@@ -112,10 +112,10 @@ sens_mgmt_ben <- c(0.02, 0.05, 0.1, 0.15, 0.3)
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 100
+n_sims <- 100 #try 10000
 
 # Set number of sample reefs, num_samples
-num_samples <- 3000
+num_samples <- 100
 ############################################
 
 ####### INITIALISE VARIABLES AND DFS #######
@@ -498,6 +498,12 @@ comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint) # Compound d
 sample_reefs_df$is_managed_single <- get_solution(sing_result, y[i])$value
 sample_reefs_df$is_managed_cumul <- get_solution(comp_result, y[i])$value
 
+# Check the optimisation makes sense
+sample_reefs_df$difference_single <- sample_reefs_df$pr_recov_sing_mgd -
+  sample_reefs_df$pr_recov_sing_unmgd
+sample_reefs_df$difference_comp <- sample_reefs_df$pr_recov_comp_mgd -
+  sample_reefs_df$pr_recov_comp_unmgd
+
 # Transform to sf
 sample_reefs_df <- st_as_sf(sample_reefs_df, crs = st_crs(sector_boundaries))
 
@@ -522,9 +528,9 @@ for (i in seq_len(nrow(sample_reefs_df))) {
 }
 
 cols <- c("Single Only" = "steelblue1", 
-          "Single and Cumulative " = "steelblue4",
+          "Single and Cumulative" = "steelblue4",
           "Both" = "#945cee",
-          "Neither" = "grey")
+          "Never selected for management" = "grey")
 
 # Make visualisation 1: Map of management regions
 # Sample reefs that are never chosen to manage in either scenario are grey circles
@@ -558,17 +564,28 @@ opt_vis_1_1 <- ggplot() +
 
 # Create df for subsetted plot
 opt_vis_1_df <- data.frame(
-  sing_or_cumul = c("Single Only", "Single Only", "Single and Cumulative"),
-  variable = c("Single Only - Perceived", "Single Only - Actual", "Single and Cumulative"),
+  sing_or_cumul = c("Single Only", "Single Only", "Single and Cumulative", "Single and Cumulative"),
+  variable = c("Single Only - Perceived", "Single Only - Actual", "Single and Cumulative", "No Management"),
   value = c(
-    sum(sample_reefs_df$pr_recov_sing_mgd[sample_reefs_df$is_managed_single]) +
-      sum(sample_reefs_df$pr_recov_sing_unmgd[1 - sample_reefs_df$is_managed_single]),
-    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_single]) +
-      sum(sample_reefs_df$pr_recov_comp_unmgd[1 - sample_reefs_df$is_managed_single]),
-    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_cumul]) +
-      sum(sample_reefs_df$pr_recov_comp_unmgd[1 - sample_reefs_df$is_managed_cumul])
+    sum(sample_reefs_df$pr_recov_sing_mgd[sample_reefs_df$is_managed_single == 1]) +
+      sum(sample_reefs_df$pr_recov_sing_unmgd[sample_reefs_df$is_managed_single == 0]),
+    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_single == 1]) +
+      sum(sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_single == 0]),
+    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_cumul == 1]) +
+      sum(sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_cumul == 0]),
+    sum(sample_reefs_df$pr_recov_comp_unmgd)
   )
 )
+
+# Try another way
+new_df <- data.frame(
+  no_management_real_dist = sum(sample_reefs_df$pr_recov_comp_unmgd),
+)
+
+cols <- c("Single Only - Perceived" = "#a2d0f6", 
+          "Single Only - Actual" = "steelblue1",
+          "Single and Cumulative" = "steelblue4",
+          "No Management" = "grey")
 
 # Add inset plot to vis 1: simple bar chart in the bottom left corner
 # of the expected number of reefs in a recovered state for single and cumulative scenario
@@ -600,12 +617,7 @@ opt_vis_1_2 <- ggplot() +
   ) +
   scale_fill_manual(
     name = "",
-    labels = c(
-      "Single and\nCumulative",
-      "Single Only\n- Actual",
-      "Single Only\n- Perceived"
-    ),
-    values = c("steelblue4", "steelblue1", "grey")
+    values = cols
   ) +
   labs(
     x = "Disturbances Considered",
@@ -709,6 +721,60 @@ if (is_time_based) {
   )
 }
 
+# Attempt 2 at visualisation 2: Make a hexmap of each scenario first, assign each hexagon an ID
+# Then plot the bump chart from the hexagon information
+single_vals_vis_2 <- sample_reefs_df %>%
+  mutate(
+    x_single = st_coordinates(point_loc)[, "X"],
+    y_single = st_coordinates(point_loc)[, "Y"]
+  ) %>%
+  select(x_single, y_single, is_managed_single)
+vis_2_single_hex <- ggplot() +
+  geom_sf(data = sector_boundaries, lwd = 0.01) +
+  theme_classic() +
+  labs(
+    x = "Longitude",
+    y = "Latitude",
+    tag = "A"
+  ) +
+  stat_summary_hex(
+    data = single_vals_vis_2,
+    aes(x = x_single, y = y_single, z = is_managed_single),
+    fun = ~sum(.x),
+    binwidth = c(0.5, 0.5),
+    na.rm = TRUE,
+    geom = "hex"
+  ) +
+  theme(plot.tag = element_text())
+
+cumul_vals_vis_2 <- sample_reefs_df %>%
+  mutate(
+    x_cumul = st_coordinates(point_loc)[, "X"],
+    y_cumul = st_coordinates(point_loc)[, "Y"]
+  ) %>%
+  select(x_cumul, y_cumul, is_managed_cumul)
+
+vis_2_cumul_hex <- ggplot() +
+  geom_sf(data = sector_boundaries, lwd = 0.01) +
+  theme_classic() +
+  labs(
+    x = "Longitude",
+    y = "Latitude",
+    tag = "B"
+  ) +
+  stat_summary_hex(
+    data = cumul_vals_vis_2,
+    aes(x = x_cumul, y = y_cumul, z = is_managed_cumul),
+    fun = ~sum(.x),
+    binwidth = c(0.5, 0.5),
+    na.rm = TRUE,
+    geom = "hex"
+  ) +
+  theme(plot.tag = element_text())
+
+# Assign each hexagon an ID
+single_hex_df <- ggplot_build(vis_2_single_hex)$data[[1]]
+
 # Make visualisation 3: Density of the number of disturbances, split by managed/not managed
 # and by management scenario
 opt_vis_3 <- ggplot(sample_reefs_df, 
@@ -717,9 +783,11 @@ opt_vis_3 <- ggplot(sample_reefs_df,
   geom_density(alpha = 0.5) +
   theme_classic() +
   theme(
-    legend.position = "bottom",
+    legend.position = "right",
     legend.background = element_blank(),
-    legend.justification = c("center", "bottom")
+    legend.justification = c("right", "center"),
+    legend.text = element_text(size = 6),
+    legend.title = element_text(size = 8)
   ) +
   scale_color_manual(values = cols) +
   labs(
@@ -735,7 +803,7 @@ if (is_time_based) {
       out_path, "/OptVis3_TimeBased",
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
-    plot = opt_vis_3, width = 5, height = 5
+    plot = opt_vis_3, width = 7, height = 5
   )
 } else {
   ggsave(
@@ -743,7 +811,7 @@ if (is_time_based) {
       out_path, "/OptVis3_RecovBased",
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
-    plot = opt_vis_3, width = 5, height = 5
+    plot = opt_vis_3, width = 7, height = 5
   )
 }
 
@@ -765,8 +833,9 @@ colnames(all_samples) <- column_names
 all_samples <- all_samples %>%
   mutate(
     is_managed_single = NA, # column in df for managed/not (single)
-    is_managed_cumul = NA
-  ) # column for managed/not (compound)
+    is_managed_cumul = NA, # column for managed/not (compound)
+    sim_num = rep(seq(n_sims), each = num_samples) # column for simulation number
+  ) 
 
 # For each simulation,
 for (sim in 1:n_sims) {
@@ -832,9 +901,13 @@ single_plot <- ggplot() +
     y = "Latitude",
     tag = "A"
   ) +
-  geom_hex(single_vals,
-    mapping = aes(x_single, y_single),
-    binwidth = c(0.5, 0.5)
+  stat_summary_hex(
+    data = single_vals,
+    aes(x = x_single, y = y_single, z = is_managed_single),
+    fun = ~sum(.x) / n_sims,
+    binwidth = c(0.5, 0.5),
+    na.rm = TRUE,
+    geom = "hex"
   ) +
   theme(plot.tag = element_text())
 
@@ -853,12 +926,15 @@ compound_plot <- ggplot() +
     y = "Latitude",
     tag = "B"
   ) +
-  geom_hex(compound_vals,
-    mapping = aes(x_compound, y_compound),
-    binwidth = c(0.5, 0.5)
+  stat_summary_hex(
+    data = compound_vals,
+    aes(x = x_compound, y = y_compound, z = is_managed_cumul),
+    fun = ~sum(.x) / n_sims,
+    binwidth = c(0.5, 0.5),
+    na.rm = TRUE,
+    geom = "hex"
   ) +
   theme(plot.tag = element_text())
-compound_plot
 
 p <- ggplot_build(single_plot)$data[[2]]
 q <- ggplot_build(compound_plot)$data[[2]]
@@ -871,14 +947,17 @@ single_plot <- ggplot() +
     y = "Latitude",
     tag = "A"
   ) +
-  theme(plot.tag = element_text()) +
-  geom_hex(single_vals,
-    mapping = aes(x_single, y_single),
-    binwidth = c(0.5, 0.5)
+  stat_summary_hex(
+    data = single_vals,
+    aes(x = x_single, y = y_single, z = is_managed_single),
+    fun = ~sum(.x) / n_sims,
+    binwidth = c(0.5, 0.5),
+    na.rm = TRUE,
+    geom = "hex"
   ) +
   scale_fill_continuous(limits = c(
-    min(p$count, q$count),
-    max(p$count, q$count)
+    min(p$value, q$value),
+    max(p$value, q$value)
   )) +
   labs(fill = "Average Number of \nManaged Reefs")
 
@@ -890,13 +969,18 @@ compound_plot <- ggplot() +
     y = "Latitude",
     tag = "B"
   ) +
-  geom_hex(compound_vals,
-    mapping = aes(x_compound, y_compound),
-    binwidth = c(0.5, 0.5)
+  stat_summary_hex(
+    data = compound_vals,
+    aes(x = x_compound, y = y_compound, z = is_managed_cumul),
+    fun = ~sum(.x) / n_sims,
+    binwidth = c(0.5, 0.5),
+    na.rm = TRUE,
+    geom = "hex"
   ) +
+  theme(plot.tag = element_text()) +
   scale_fill_continuous(limits = c(
-    min(p$count, q$count),
-    max(p$count, q$count)
+    min(p$value, q$value),
+    max(p$value, q$value)
   )) +
   theme(plot.tag = element_text())
 
