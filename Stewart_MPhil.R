@@ -309,12 +309,12 @@ opt_vis_1_df <- data.frame(
   sing_or_cumul = c("Single Only", "Single Only", "Single and Cumulative", "No Management"),
   variable = c("Single Only - Perceived", "Single Only - Actual", "Single and Cumulative", "No Management"),
   value = c(
-    sum(sample_reefs_df$pr_recov_sing_mgd[sample_reefs_df$is_managed_single == 1]) +
-      sum(sample_reefs_df$pr_recov_sing_unmgd[sample_reefs_df$is_managed_single == 0]),
-    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_single == 1]) +
-      sum(sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_single == 0]),
-    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_cumul == 1]) +
-      sum(sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_cumul == 0]),
+    sum(c(sample_reefs_df$pr_recov_sing_mgd[sample_reefs_df$is_managed_single == 1],
+        sample_reefs_df$pr_recov_sing_unmgd[sample_reefs_df$is_managed_single == 0])),
+    sum(c(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_single == 1], 
+          sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_single == 0])),
+    sum(c(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_cumul == 1],
+          sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_cumul == 0])),
     sum(sample_reefs_df$pr_recov_comp_unmgd)
   )
 )
@@ -443,8 +443,16 @@ opt_vis_2 <- ggplot(opt_vis_2_df, aes(x = scenario,
                                       group = point_id)) +
   geom_bump(linewidth = 1,
             alpha = 0.5) +
-  geom_point(size = 1) +
-  theme_classic() +
+  geom_point(size = 2) +
+  theme_void() +
+  geom_text(data = opt_vis_2_df %>% filter(scenario == "position_s"),
+            aes(label = position, 
+                x = 0.75),
+            size = 3, hjust = "middle", col = "steelblue1") +
+  geom_text(data = opt_vis_2_df %>% filter(scenario == "position_c"),
+            aes(label = position, 
+                x = 2.25),
+            size = 3, hjust = "left", col = "steelblue4") +
   theme(
     legend.position = "right",
     legend.background = element_blank(),
@@ -453,8 +461,10 @@ opt_vis_2 <- ggplot(opt_vis_2_df, aes(x = scenario,
     legend.box.just = "left",
     legend.margin = margin(5, 10, 5, 5),
     axis.title = element_text(size = 11),
-    axis.text = element_text(size = 9)
+    axis.text.x = element_text(size = 9),
+    axis.text.y = element_blank()
   ) +
+  scale_color_brewer(palette = "RdYlGn") +
   labs(
     x = "Management Scenario",
     y = "Reef Priority",
@@ -472,7 +482,7 @@ if (is_time_based) {
       out_path, "/OptVis2_TimeBased",
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
-    plot = opt_vis_2, width = 6, height = 6
+    plot = opt_vis_2, width = 5, height = 8
   )
 } else {
   ggsave(
@@ -480,7 +490,7 @@ if (is_time_based) {
       out_path, "/OptVis2_RecovBased",
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
-    plot = opt_vis_2, width = 6, height = 6
+    plot = opt_vis_2, width = 5, height = 8
   )
 }
 
@@ -551,6 +561,10 @@ for (i in seq_len(nrow(all_samples))) {
     all_samples$scenario_managed[i] <- "Both"
   }
 }
+
+opt_result_1 <- all_samples %>%
+  group_by(scenario_managed) %>%
+  summarise(perc = n() / nrow(all_samples))
 
 # Visualise the reefs to manage
 all_samples <- st_as_sf(all_samples, crs = st_crs(sector_boundaries))

@@ -7,7 +7,7 @@ optimiser_single <- function(df, mgmt_constraint) {
                              (1 - y[i]) * df$pr_recov_sing_unmgd[i],
                            i = 1:num_reefs),
                   sense = "max") %>% 
-    add_constraint(sum_expr(y[i], i = 1:num_reefs) <= ceiling(mgmt_constraint * 
+    add_constraint(sum_expr(y[i], i = 1:num_reefs) <= floor(mgmt_constraint * 
                                                                 num_reefs)) %>% 
     solve_model(with_ROI("glpk"))
   
