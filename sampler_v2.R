@@ -4,7 +4,7 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
                       is_time_based, recov_th, recov_yrs, cots_dist, cyc_dist,
                       dhw_dist) {
   # Define the number of reefs per management area
-  unique_mgmts <- unique(reef_df$management_region)
+  unique_mgmts <- unique(reef_df$sector)
   reefs_per_mgmt <- floor(num_samples / length(unique_mgmts))
   num_samples <- reefs_per_mgmt * length(unique_mgmts)
 
@@ -58,10 +58,10 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
     sample_mgmt_indx <- which(sample_reefs_df$sector == unique_mgmts[row])
 
     # Sample the probability of impact from single disturbance for the management area
-    if (any(!is.na(reef_df$prob_s_impact[reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]]))) {
+    if (any(!is.na(reef_df$prob_s_impact[reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]]))) {
       sample_reefs_df$prob_s_impact[sample_mgmt_indx] <- sample(
         reef_df$prob_s_impact[!is.na(reef_df$prob_s_impact) &
-          reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]],
+          reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]],
         reefs_per_mgmt,
         replace = TRUE
       )
@@ -78,17 +78,17 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
 
       sample_reefs_df$prob_s_impact[sample_mgmt_indx] <- sample(
         reef_df$prob_s_impact[!is.na(reef_df$prob_s_impact) &
-          reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]],
+          reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]],
         reefs_per_mgmt,
         replace = TRUE
       )
     }
     
     # Sample the probability of impact from compound disturbance for the management area
-    if (any(!is.na(reef_df$prob_c_impact[reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]]))) {
+    if (any(!is.na(reef_df$prob_c_impact[reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]]))) {
       sample_reefs_df$prob_c_impact[sample_mgmt_indx] <- sample(
         reef_df$prob_c_impact[!is.na(reef_df$prob_c_impact) &
-          reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]],
+          reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]],
         reefs_per_mgmt,
         replace = TRUE
       )
@@ -105,17 +105,17 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
 
       sample_reefs_df$prob_c_impact[sample_mgmt_indx] <- sample(
         reef_df$prob_c_impact[!is.na(reef_df$prob_c_impact) &
-          reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]],
+          reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]],
         reefs_per_mgmt,
         replace = TRUE
       )
     }
     
     # Sample the probability of recovery from single disturbance for the management area
-    if (any(!is.na(reef_df$prob_s_recov[reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]]))) {
+    if (any(!is.na(reef_df$prob_s_recov[reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]]))) {
       sample_reefs_df$prob_s_recov[sample_mgmt_indx] <- sample(
         reef_df$prob_s_recov[!is.na(reef_df$prob_s_recov) &
-          reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]],
+          reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]],
         reefs_per_mgmt,
         replace = TRUE
       )
@@ -132,17 +132,17 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
 
       sample_reefs_df$prob_s_recov[sample_mgmt_indx] <- sample(
         reef_df$prob_s_recov[!is.na(reef_df$prob_s_recov) &
-          reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]],
+          reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]],
         reefs_per_mgmt,
         replace = TRUE
       )
     }
 
     # Sample the probability of recovery from compound disturbance for the management area
-    if (any(!is.na(reef_df$prob_c_recov[reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]]))) {
+    if (any(!is.na(reef_df$prob_c_recov[reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]]))) {
       sample_reefs_df$prob_c_recov[sample_mgmt_indx] <- sample(
         reef_df$prob_c_recov[!is.na(reef_df$prob_c_recov) &
-          reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]],
+          reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]],
         reefs_per_mgmt,
         replace = TRUE
       )
@@ -159,7 +159,7 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
 
       sample_reefs_df$prob_c_recov[sample_mgmt_indx] <- sample(
         reef_df$prob_c_recov[!is.na(reef_df$prob_c_recov) &
-          reef_df$management_region == sector_boundaries$AREA_DESCR[mgmt_index]],
+          reef_df$sector == sector_boundaries$AREA_DESCR[mgmt_index]],
         reefs_per_mgmt,
         replace = TRUE
       )

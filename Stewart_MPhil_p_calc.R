@@ -3,9 +3,9 @@
 #   these new values.
 p_calculator <- function(reef_data, mgmt_benefit) {
   reef_data <- mutate(reef_data,
-    r_single_unmgd = as.numeric(prob_s_recov),
+    r_single_unmgd = prob_s_recov,
     r_single_mgd = 0,
-    r_comp_unmgd = as.numeric(prob_c_recov),
+    r_comp_unmgd = prob_c_recov,
     r_comp_mgd = 0,
     pr_recov_sing_unmgd = 0,
     pr_recov_sing_mgd = 0,
@@ -13,26 +13,44 @@ p_calculator <- function(reef_data, mgmt_benefit) {
     pr_recov_comp_mgd = 0
   )
 
+  # Convert all columns except reef_name and sector to numeric
+  cols_names <- c("prob_s_dist", "prob_c_dist", 
+                  "prob_s_impact", "prob_c_impact", 
+                  "prob_s_recov", "prob_c_recov", 
+                  "r_single_unmgd", "r_single_mgd", 
+                  "r_comp_unmgd", "r_comp_mgd", 
+                  "pr_recov_sing_unmgd", "pr_recov_sing_mgd", 
+                  "pr_recov_comp_unmgd", "pr_recov_comp_mgd")
+  reef_data[cols_names] <- sapply(reef_data[cols_names], as.numeric)
+
   # For each reef,
   for (reef in 1:nrow(reef_data)) {
     sector_indx <- which(reef_data$sector == reef_data$sector[reef])
     if (is.na(reef_data$prob_s_recov[reef])) {
       # Get recovery rates in the management area/sector
-      sector_s_recovs <- reef_data$prob_s_recov[sector_indx]
+      sector_s_recovs <- reef_data$prob_s_recov[sector_indx] %>%
+        as.numeric()
+      sector_s_recovs <- sector_s_recovs[!is.na(sector_s_recovs)]
 
       # Sample from the non-NA recovery rates in the management area/sector
-      reef_data$r_single_unmgd[reef] <- sample(sector_s_recovs[!is.na(sector_s_recovs)], 1)
+      ifelse(length(sector_s_recovs) == 0,
+        reef_data$r_single_unmgd[reef] <- sample(reef_data$prob_s_recov[!is.na(reef_data$prob_s_recov)], 1),
+        reef_data$r_single_unmgd[reef] <- sample(sector_s_recovs, 1))
     } 
-    reef_data$r_single_mgd[reef] <- min(reef_data$r_single_unmgd[reef] * (1 + mgmt_benefit), 1)
+    reef_data$r_single_mgd[reef] <- min(as.numeric(reef_data$r_single_unmgd[reef]) * (1 + mgmt_benefit), 1)
 
     if (is.na(reef_data$prob_c_recov[reef])) {
       # Get recovery rates in the management area/sector
-      sector_c_recovs <- reef_data$prob_c_recov[sector_indx]
+      sector_c_recovs <- reef_data$prob_c_recov[sector_indx] %>%
+        as.numeric()
+      sector_c_recovs <- sector_c_recovs[!is.na(sector_c_recovs)]
 
       # Sample from the non-NA recovery rates in the management area/sector
-      reef_data$r_comp_unmgd[reef] <- sample(sector_c_recovs[!is.na(sector_c_recovs)], 1)
+      ifelse(length(sector_c_recovs) == 0,
+        reef_data$r_comp_unmgd[reef] <- sample(reef_data$prob_c_recov[!is.na(reef_data$prob_c_recov)], 1),
+        reef_data$r_comp_unmgd[reef] <- sample(sector_c_recovs, 1))
     }
-    reef_data$r_comp_mgd[reef] <- min(reef_data$r_comp_unmgd[reef] * (1 + mgmt_benefit), 1)
+    reef_data$r_comp_mgd[reef] <- min(as.numeric(reef_data$r_comp_unmgd[reef]) * (1 + mgmt_benefit), 1)
 
     # Calculate probability of recovered state for area if managed in single model
     # Prob disturbance at area

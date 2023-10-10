@@ -92,12 +92,12 @@ is_time_based <- FALSE
 #  Note: for time-overlap compounding only
 recov_yrs <- 5
 
-# Threshold of percent of pre-disturbance cover considered "recovered"
+# Threshold percent of pre-disturbance max cover considered "recovered"
 #  Note: for recovery-overlap compounding only
 recov_th <- 0.75
 
 # Management benefit (currently % added to mgd reef recovery rate)
-mgmt_benefit <- 0.1
+mgmt_benefit <- 0.2
 
 # Management constraint (base: 30% of number of reefs in system)
 mgmt_constraint <- 0.20
@@ -216,266 +216,6 @@ game_c_reef_ci <- quantile(compound_reefs$prob_c_recov,
 # Calculate probability of reef being in a recovered state
 reef_df <- p_calculator(reef_df, mgmt_benefit)
 
-# Summarise d,r,p for single and compound dist in each sector
-sector_df <- data.frame(
-  sector = unique(reef_df$management_region),
-  num_single = NA,
-  ave_prob_s_dist = NA,
-  s_dist_ci_lwr = NA,
-  s_dist_ci_upr = NA,
-  ave_prob_s_impact = NA,
-  s_impact_ci_lwr = NA,
-  s_impact_ci_upr = NA,
-  ave_prob_s_recov = NA,
-  s_recov_ci_lwr = NA,
-  s_recov_ci_upr = NA,
-  num_compound = NA,
-  ave_prob_c_dist = NA,
-  c_dist_ci_lwr = NA,
-  c_dist_ci_upr = NA,
-  ave_prob_c_impact = NA,
-  c_impact_ci_lwr = NA,
-  c_impact_ci_upr = NA,
-  ave_prob_c_recov = NA,
-  c_recov_ci_lwr = NA,
-  c_recov_ci_upr = NA,
-  ave_r_s_unmgd = NA,
-  ave_r_c_unmgd = NA,
-  pr_recov_sing_unmgd = NA,
-  pr_recov_comp_unmgd = NA,
-  ave_r_s_mgd = NA,
-  ave_r_c_mgd = NA,
-  pr_recov_sing_mgd = NA,
-  pr_recov_comp_mgd = NA
-)
-
-# For each section
-for (sector in unique(reef_df$management_region)) {
-  reef_df_indx <- which(reef_df$management_region == sector)
-  sec_df_indx <- which(sector_df$sector == sector)
-
-  # Calculate number of single disturbances
-  sector_df$num_single[sec_df_indx] <- reef_df$num_single[reef_df_indx] %>%
-    as.numeric() %>%
-    sum(na.rm = TRUE)
-
-  # Calculate number of compound disturbances
-  sector_df$num_compound[sec_df_indx] <- reef_df$num_comp[reef_df_indx] %>%
-    as.numeric() %>%
-    sum(na.rm = TRUE)
-
-  # Calculate probability of single disturbance
-  sector_df$ave_prob_s_dist[sec_df_indx] <- reef_df$prob_s_dist[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate confidence interval of recovery from single dist (unmanaged)
-  ci_s_dist <- reef_df$prob_s_dist[reef_df_indx] %>%
-    as.numeric() %>%
-    quantile(c(0.025, 0.975), na.rm = TRUE)
-  sector_df$s_dist_ci_lwr[sec_df_indx] <- ci_s_dist[1]
-  sector_df$s_dist_ci_upr[sec_df_indx] <- ci_s_dist[2]
-
-  # Calculate probability of compound disturbance
-  sector_df$ave_prob_c_dist[sec_df_indx] <- reef_df$prob_c_dist[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate confidence interval of recovery from single disturbance
-  ci_c_dist <- reef_df$prob_c_dist[reef_df_indx] %>%
-    as.numeric() %>%
-    quantile(c(0.025, 0.975), na.rm = TRUE)
-  sector_df$c_dist_ci_lwr[sec_df_indx] <- ci_c_dist[1]
-  sector_df$c_dist_ci_upr[sec_df_indx] <- ci_c_dist[2]
-
-  # Calculate probability of impact from single disturbance
-  sector_df$ave_prob_s_impact[sec_df_indx] <- reef_df$prob_s_impact[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate confidence interval of impact from single disturbance
-  ci_s_impact <- reef_df$prob_s_impact[reef_df_indx] %>%
-    as.numeric() %>%
-    quantile(c(0.025, 0.975), na.rm = TRUE)
-  sector_df$s_impact_ci_lwr[sec_df_indx] <- ci_s_impact[1]
-  sector_df$s_impact_ci_upr[sec_df_indx] <- ci_s_impact[2]
-
-  # Calculate probability of impact from compound disturbance
-  sector_df$ave_prob_c_impact[sec_df_indx] <- reef_df$prob_c_impact[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate confidence interval of impact from compound disturbance
-  ci_c_impact <- reef_df$prob_c_impact[reef_df_indx] %>%
-    as.numeric() %>%
-    quantile(c(0.025, 0.975), na.rm = TRUE)
-  sector_df$c_impact_ci_lwr[sec_df_indx] <- ci_c_impact[1]
-  sector_df$c_impact_ci_upr[sec_df_indx] <- ci_c_impact[2]
-
-  # Calculate probability of recovery from single disturbance (unmanaged)
-  sector_df$ave_prob_s_recov[sec_df_indx] <- reef_df$prob_s_recov[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate confidence interval of recovery from single disturbance
-  ci_s_recov <- reef_df$prob_s_recov[reef_df_indx] %>%
-    as.numeric() %>%
-    quantile(c(0.025, 0.975), na.rm = TRUE)
-  sector_df$s_recov_ci_lwr[sec_df_indx] <- ci_s_recov[1]
-  sector_df$s_recov_ci_upr[sec_df_indx] <- ci_s_recov[2]
-
-  # Calculate probability of recovery from single disturbance (unmanaged)
-  sector_df$ave_prob_c_recov[sec_df_indx] <- reef_df$prob_c_recov[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate confidence interval of recovery from single disturbance
-  ci_c_recov <- reef_df$prob_c_recov[reef_df_indx] %>%
-    as.numeric() %>%
-    quantile(c(0.025, 0.975), na.rm = TRUE)
-  sector_df$c_recov_ci_lwr[sec_df_indx] <- ci_c_recov[1]
-  sector_df$c_recov_ci_upr[sec_df_indx] <- ci_c_recov[2]
-
-  # Calculate probability of recovery from single disturbance (managed)
-  ave_r_s_mgd <- reef_df$prob_s_recov[reef_df_indx] %>%
-    as.numeric() * (1 + mgmt_benefit) %>%
-      min(1)
-  sector_df$ave_r_s_mgd[sec_df_indx] <- mean(ave_r_s_mgd, na.rm = TRUE)
-
-  # Calculate probability of recovery from compound disturbance (managed)
-  ave_r_c_mgd <- reef_df$prob_c_recov[reef_df_indx] %>%
-    as.numeric() * (1 + mgmt_benefit) %>%
-      min(1)
-  sector_df$ave_r_c_mgd[sec_df_indx] <- mean(ave_r_c_mgd, na.rm = TRUE)
-
-  # Calculate probability of recovery from single disturbance (unmanaged)
-  sector_df$ave_r_s_unmgd[sec_df_indx] <- reef_df$prob_s_recov[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate probability of recovery from compound disturbance (unmanaged)
-  sector_df$ave_r_c_unmgd[sec_df_indx] <- reef_df$prob_c_recov[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate probability of recovery from single disturbance (unmanaged)
-  sector_df$pr_recov_sing_unmgd[sec_df_indx] <- reef_df$pr_recov_sing_unmgd[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate probability of recovery from single disturbance (managed)
-  sector_df$pr_recov_sing_mgd[sec_df_indx] <- reef_df$pr_recov_sing_mgd[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate probability of recovery from compound disturbance (unmanaged)
-  sector_df$pr_recov_comp_unmgd[sec_df_indx] <- reef_df$pr_recov_comp_unmgd[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-
-  # Calculate probability of recovery from compound disturbance (managed)
-  sector_df$pr_recov_comp_mgd[sec_df_indx] <- reef_df$pr_recov_comp_mgd[reef_df_indx] %>%
-    as.numeric() %>%
-    mean(na.rm = TRUE)
-}
-
-############################################
-
-########## MGMT AREA OPTIMISATION ##########
-# Optimise over management areas
-sing_result <- optimiser_single(sector_df, mgmt_constraint) # Single dist sol
-comp_result <- optimiser_compound(sector_df, mgmt_constraint) # Compound dist sol
-
-# PRINT RESULTS
-reef_s_to_manage_s <- which(get_solution(sing_result, y[i])$value == 1)
-prcvd_exp_recov_s <- sum(sector_df$pr_recov_sing_mgd[reef_s_to_manage_s]) +
-  sum(sector_df$pr_recov_sing_unmgd[-c(reef_s_to_manage_s)]) # Perceived reefs in recov state
-actual_exp_recov_s <- sum(sector_df$pr_recov_comp_mgd[reef_s_to_manage_s]) +
-  sum(sector_df$pr_recov_comp_unmgd[-c(reef_s_to_manage_s)]) # Actual reefs in recov state
-reef_s_to_manage_c <- which(get_solution(comp_result, y[i])$value == 1)
-exp_recov_c <- sum(sector_df$pr_recov_comp_mgd[reef_s_to_manage_c]) +
-  sum(sector_df$pr_recov_comp_unmgd[-c(reef_s_to_manage_c)]) # Expected reefs in recov state
-print(paste(
-  "When only considering single disturbances, it is recommended to manage reef/s",
-  reef_s_to_manage_s, "for a perceived", prcvd_exp_recov_s,
-  "reefs in a recovered state, but an actual", actual_exp_recov_s,
-  "reefs in a recovered state. In the compound disturbance scenario,",
-  "it is recommended to manage reef/s", reef_s_to_manage_c,
-  "for an expected", exp_recov_c, "reefs in a recovered state."
-))
-############################################
-
-######## MGMT AREA OPT VISUALISATION #######
-# Dumbbell plot
-library(ggalt)
-
-sector_df$sector <- as.factor(sector_df$sector)
-
-dumbbell_df <- melt(
-  sector_df[, c(
-    "sector",
-    "pr_recov_comp_unmgd",
-    "pr_recov_sing_unmgd"
-  )],
-  id.vars = "sector"
-)
-xy <- st_coordinates(st_centroid(sector_boundaries$geometry))
-gbr_name_order <- sector_boundaries$AREA_DESCR[order(xy[, "X"], xy[, "Y"],
-  decreasing = TRUE
-)]
-
-ggplot(
-  data = dumbbell_df,
-  aes(x = value, y = sector)
-) +
-  geom_line(color = "azure3") +
-  geom_point(aes(color = variable), size = 3) +
-  theme(legend.position = "bottom") +
-  theme_light() +
-  theme(
-    panel.grid.minor = element_blank(),
-    panel.grid.major.y = element_blank()
-  ) +
-  scale_color_manual(
-    name = "",
-    labels = c(
-      "Compound disturbance included",
-      "Singular disturbance only"
-    ),
-    values = c("steelblue1", "steelblue4")
-  ) +
-  scale_y_discrete(limits = gbr_name_order[gbr_name_order %in% dumbbell_df$sector]) +
-  scale_x_continuous(limits = c(0.5, 1)) +
-  labs(
-    x = "Probability the Reef is Recovered",
-    y = "GBRMPA Management Area"
-  ) +
-  theme(
-    legend.title = element_blank(),
-    legend.position = c(.025, .975),
-    legend.background = element_blank(),
-    legend.box.background = element_rect(colour = "azure3"),
-    legend.justification = c("left", "top"),
-    legend.box.just = "left",
-    legend.margin = margin(0, 5, 4, 3)
-  )
-if (is_time_based) {
-  ggsave(
-    paste0(
-      out_path, "/Dumbbell_TimeBased",
-      recov_yrs, "yr", mgmt_benefit, "mgmt.png"
-    ),
-    plot = last_plot(), width = 6, height = 5
-  )
-} else {
-  ggsave(
-    paste0(
-      out_path, "/Dumbbell_RecovBased",
-      recov_th, "th", mgmt_benefit, "mgmt.png"
-    ),
-    plot = last_plot(), width = 6, height = 5
-  )
-}
 ############################################
 
 ################# SAMPLING #################
@@ -564,7 +304,7 @@ opt_vis_1_1 <- ggplot() +
 
 # Create df for subsetted plot
 opt_vis_1_df <- data.frame(
-  sing_or_cumul = c("Single Only", "Single Only", "Single and Cumulative", "Single and Cumulative"),
+  sing_or_cumul = c("Single Only", "Single Only", "Single and Cumulative", "No Management"),
   variable = c("Single Only - Perceived", "Single Only - Actual", "Single and Cumulative", "No Management"),
   value = c(
     sum(sample_reefs_df$pr_recov_sing_mgd[sample_reefs_df$is_managed_single == 1]) +
@@ -577,10 +317,10 @@ opt_vis_1_df <- data.frame(
   )
 )
 
-# Try another way
-new_df <- data.frame(
-  no_management_real_dist = sum(sample_reefs_df$pr_recov_comp_unmgd),
-)
+# # Try another way
+# new_df <- data.frame(
+#   no_management_real_dist = sum(sample_reefs_df$pr_recov_comp_unmgd),
+# )
 
 cols <- c("Single Only - Perceived" = "#a2d0f6", 
           "Single Only - Actual" = "steelblue1",
@@ -644,7 +384,78 @@ if (is_time_based) {
   )
 }
 
-# Alter sample_reefs_df to have column of disfference in probability of being in a recovered state
+# Add inset plot to vis 1: simple bar chart
+# of the difference in expected number of reefs in a recovered state for single and cumulative scenario
+# compared to no management
+opt_vis_1_df_2 <- data.frame(
+  sing_or_cumul = c("Single Only", "Single and Cumulative"),
+  variable = c("Single Only", "Single and Cumulative"),
+  value = c(
+    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_single == 1]) +
+      sum(sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_single == 0]) -
+      sum(sample_reefs_df$pr_recov_comp_unmgd),
+    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_cumul == 1]) +
+      sum(sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_cumul == 0]) -
+      sum(sample_reefs_df$pr_recov_comp_unmgd)
+  )
+)
+cols_1_3 <- c("Single Only" = "steelblue1", 
+          "Single and Cumulative" = "steelblue4")
+opt_vis_1_3 <- ggplot() +
+  geom_bar(
+    data = opt_vis_1_df_2,
+    aes(
+      x = sing_or_cumul,
+      y = value,
+      fill = variable
+    ),
+    stat = "identity",
+    position = position_identity()
+  ) +
+  theme_classic() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 6),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_text(size = 8),
+    plot.margin = unit(c(-1, -1, -1, -1), "cm"),
+    legend.position = "bottom",
+    legend.text = element_text(size = 6),
+    legend.box.margin = margin(0, 0, 0, 0),
+    legend.box.spacing = unit(0, "cm")
+  ) +
+  scale_fill_manual(
+    name = "",
+    values = cols_1_3
+  ) +
+  labs(
+    x = "Disturbances Considered",
+    y = "Expected Number of\nReefs Considered Recovered"
+  )
+opt_vis_1_1 + inset_element(opt_vis_1_3, 0.5, 0.6, 0.975, 0.975)
+
+# Save plot
+if (is_time_based) {
+  ggsave(
+    paste0(
+      out_path, "/OptVis1_2_TimeBased",
+      recov_yrs, "yr", mgmt_benefit, "mgmt.png"
+    ),
+    plot = last_plot(), width = 5, height = 5
+  )
+} else {
+  ggsave(
+    paste0(
+      out_path, "/OptVis1_2_RecovBased",
+      recov_th, "th", mgmt_benefit, "mgmt.png"
+    ),
+    plot = last_plot(), width = 5, height = 5
+  )
+}
+
+# Alter sample_reefs_df to have column of difference in probability of being in a recovered state
 # when managed/not
 sample_reefs_df <- sample_reefs_df %>%
   mutate(
@@ -774,6 +585,17 @@ vis_2_cumul_hex <- ggplot() +
 
 # Assign each hexagon an ID
 single_hex_df <- ggplot_build(vis_2_single_hex)$data[[1]]
+single_hex_df <- single_hex_df %>%
+  mutate(
+    hex_id = row_number()
+  )
+cumul_hex_df <- ggplot_build(vis_2_cumul_hex)$data[[1]]
+cumul_hex_df <- cumul_hex_df %>%
+  mutate(
+    hex_id = row_number()
+  )
+
+
 
 # Make visualisation 3: Density of the number of disturbances, split by managed/not managed
 # and by management scenario

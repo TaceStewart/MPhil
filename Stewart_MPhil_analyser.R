@@ -24,7 +24,7 @@ analyse_reefs <- function(
         reef_name = character(),
         latitude = double(),
         longitude = double(),
-        management_region = character(),
+        sector = character(),
         num_single = integer(),
         prob_s_dist = double(),
         prob_s_impact = double(),
