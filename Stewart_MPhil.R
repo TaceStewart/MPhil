@@ -725,6 +725,19 @@ compound_plot <- ggplot() +
 p <- ggplot_build(single_plot)$data[[2]]
 q <- ggplot_build(compound_plot)$data[[2]]
 
+opt_vis_4 <- data.frame(
+  sing_or_cumul = c("Single Only", "Single and Cumulative"),
+  variable = c("Single Only", "Single and Cumulative"),
+  value = c(
+    sum(c(all_samples$pr_recov_comp_mgd[all_samples$is_managed_single == 1],
+          all_samples$pr_recov_comp_unmgd[all_samples$is_managed_single == 0])) / 
+      n_sims,
+    sum(c(all_samples$pr_recov_comp_mgd[all_samples$is_managed_cumul == 1],
+          all_samples$pr_recov_comp_unmgd[all_samples$is_managed_cumul == 0])) /
+      n_sims
+  )
+)
+
 single_plot <- ggplot() +
   geom_sf(data = sector_boundaries, lwd = 0.01) +
   theme_classic() +
@@ -746,6 +759,9 @@ single_plot <- ggplot() +
                        low = "white",
                        mid = "steelblue1",
                        high = "steelblue4") +
+  geom_text(x = 1, y = 1,
+            size = 5,
+            label = paste("Average", expression("E[R_1] ="), mean())) +
   labs(fill = "Average Number of \nManaged Reefs")
 
 compound_plot <- ggplot() +

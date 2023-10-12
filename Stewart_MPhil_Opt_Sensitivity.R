@@ -29,6 +29,7 @@ library(latex2exp) # LaTeX for ggplot
 library(patchwork)
 library(ggbump) # Delete in not using for opt vis 2
 library(GGally)
+library(pracma)
 
 # Load disturbance and recovery calculators
 source("Stewart_MPhil_single_or_compound.R")
@@ -72,7 +73,7 @@ shapefile_path <- paste0(
     "Barrier_Reef_Marine_Park.shp"
 )
 sector_boundaries <- st_read(shapefile_path,
-    quiet = TRUE
+                             quiet = TRUE
 )
 
 ############################################
@@ -121,10 +122,7 @@ n_sims <- 100 # try 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
-############################################
 
-############ MAIN CODE AS LOOP #############
-# INITIALISE VARIABLES AND DFS
 # Minimum values considered a "disturbance" in a year
 cots_dist <- 1 # cots per tow
 cyc_dist <- 10 # hours of 4m wave height
@@ -145,8 +143,8 @@ overall_unknown_count <- 0
 all_reefs_sf <- all_reefs_sf %>%
     mutate(
         is_disturbed = (all_reefs_sf$COTS_value >= cots_dist |
-            all_reefs_sf$Hs4MW_value >= cyc_dist |
-            all_reefs_sf$DHW_value >= dhw_dist),
+                            all_reefs_sf$Hs4MW_value >= cyc_dist |
+                            all_reefs_sf$DHW_value >= dhw_dist),
         is_impacted = 0,
         single_or_compound = NA,
         dist_type = NA,
@@ -169,10 +167,26 @@ opt_sensitivity_1 <- expand.grid(
     recov_th = list_recov_th,
     mgmt_benefit = list_mgmt_ben
 ) %>% mutate(
-    expected_recov_reefs_s <- NA,
-    expected_recov_reefs_c <- NA
+    expected_recov_reefs_s = NA,
+    expected_recov_reefs_c = NA
 )
 
+# Make a list to store all simulations
+sens_list_1 = replicate(n = nrow(opt_sensitivity_1),
+                        expr = {matrix(nrow = num_samples * n_sims,
+                                       ncol = length(column_names),
+                                       dimnames = list(NULL, column_names)) %>%
+                                data.frame() %>%
+                                mutate(recov_th = NA,
+                                       mgmt_benefit = NA)
+                        },
+                        simplify = F)
+
+
+############################################
+
+########### SENSITIVITY 1 LOOP #############
+i = 1
 for (recov_th in list_recov_th) {
     for (mgmt_benefit in list_mgmt_ben) {
         # SINGLE OR COMPOUND DIST
@@ -184,16 +198,16 @@ for (recov_th in list_recov_th) {
             cyc_dist, dhw_dist, infer_baseline, epsilon,
             baseline_str
         )
-
+        
         # Extract the list elements
         event_counts <- sing_comp_list[[1]]
         all_reefs_sf <- sing_comp_list[[2]]
         reef_df <- sing_comp_list[[3]]
         overall_unknown_count <- sing_comp_list[[4]]
-
+        
         # Calculate probability of reef being in a recovered state
         reef_df <- p_calculator(reef_df, mgmt_benefit)
-
+        
         # Initialise:
         all_samples <- matrix(NA, nrow = num_samples * n_sims, ncol = length(column_names)) %>%
             data.frame() # df for all sample reef info
@@ -205,7 +219,7 @@ for (recov_th in list_recov_th) {
                 scenario_managed = NA,
                 sim_num = rep(seq(n_sims), each = num_samples) # column for simulation number
             )
-
+        
         # For each simulation,
         for (sim in 1:n_sims) {
             # Sample num_samples reefs from reef_df
@@ -214,77 +228,249 @@ for (recov_th in list_recov_th) {
                 is_time_based, recov_th, recov_yrs, cots_dist, cyc_dist,
                 dhw_dist
             )
-
+            
             # Calculate p for the n reefs
             sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit)
-
+            
             from_row <- (sim - 1) * num_samples + 1
             to_row <- sim * num_samples
             all_samples[from_row:to_row, 1:length(column_names)] <- sample_reefs_df %>%
                 subset(select = column_names)
-
+            
             # Calculate single disturbance solution
             sing_result <- optimiser_single(sample_reefs_df, mgmt_constraint)
-
+            
             # Calculate compound disturbance solution
             comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint)
-
+            
             # Get the reefs to manage from solution
             sol_s <- get_solution(sing_result, y[i])$value
             sol_c <- get_solution(comp_result, y[i])$value
-
+            
             all_samples[from_row:to_row, "is_managed_single"] <- sol_s
             all_samples[from_row:to_row, "is_managed_cumul"] <- sol_c
         }
-
+        
+        # Save all_samples in list
+        sens_list_1[[i]] <- all_samples %>%
+            mutate(recov_th = recov_th,
+                   mgmt_benefit = mgmt_benefit)
+        i <- i + 1
+        
         # Calculate the expected number of reefs recovered
         expected_recov_reefs_s <- all_samples %>%
             group_by(sim_num) %>%
-            summarise(
-                num_recov_s = sum(c(
-                    all_samples$pr_recov_comp_mgd[all_samples$is_managed_single == 1],
-                    all_samples$pr_recov_comp_unmgd[all_samples$is_managed_single == 0]
-                ))
+            summarise(num_recov_s = 
+                          sum(pr_recov_comp_mgd[all_samples$is_managed_single == 1],
+                              na.rm = TRUE) +
+                          sum(pr_recov_comp_unmgd[all_samples$is_managed_single == 0],
+                              na.rm = TRUE)
             )
-
+        
         expected_recov_reefs_c <- all_samples %>%
             group_by(sim_num) %>%
-            summarise(
-                num_recov_c = sum(c(
-                    all_samples$pr_recov_comp_mgd[all_samples$is_managed_cumul == 1],
-                    all_samples$pr_recov_comp_unmgd[all_samples$is_managed_cumul == 0]
-                ))
+            summarise(num_recov_c = 
+                          sum(pr_recov_comp_mgd[all_samples$is_managed_single == 1],
+                              na.rm = TRUE) +
+                          sum(pr_recov_comp_unmgd[all_samples$is_managed_single == 0],
+                              na.rm = TRUE)
             )
-
+        
         # Save the results
         sensitivity_row <- which(opt_sensitivity_1$recov_th == recov_th &
-            opt_sensitivity_1$mgmt_benefit == mgmt_benefit)
-        opt_sensitivity_1[sensitivity_row, "expected_recov_reefs_s"] <- expected_recov_reefs_s
-        opt_sensitivity_1[sensitivity_row, "expected_recov_reefs_c"] <- expected_recov_reefs_c
+                                     opt_sensitivity_1$mgmt_benefit == mgmt_benefit)
+        opt_sensitivity_1[sensitivity_row, "expected_recov_reefs_s"] <- mean(expected_recov_reefs_s$num_recov_s)
+        opt_sensitivity_1[sensitivity_row, "expected_recov_reefs_c"] <- mean(expected_recov_reefs_c$num_recov_c)
     }
 }
 ############################################
 
-############# SAVE ENVIRONMENT #############
-if (is_time_based) {
-    save.image(paste0(
-        data_path,
-        "/SensitivityData/Opt/",
-        "TimeBased", recov_yrs, "yrs",
-        mgmt_benefit, "mgmt.RData"
-    ))
-} else {
-    save.image(paste0(
-        data_path,
-        "/SensitivityData/Opt/",
-        "RecovBased", recov_th, "th",
-        mgmt_benefit, "mgmt.RData"
-    ))
-}
+########### FIG 1: OPT TO PARAMS ###########
+opt_sensitivity_1 <- opt_sensitivity_1 %>%
+    mutate(difference = expected_recov_reefs_c - expected_recov_reefs_s)
+
+ggplot(opt_sensitivity_1, aes(x = as.factor(recov_th*100), 
+                              y = as.factor(mgmt_benefit*100), 
+                              fill = (difference))) + 
+    geom_tile() +
+    scale_fill_gradient2(midpoint = base_exp_recov, 
+                         low = "red", mid = "white",
+                         high = "blue", space = "Lab" ) +
+    labs(fill = "Difference in expected\nnumber of recovered reefs",
+         x = "Recovery Threshold (%)",
+         y = "Management Benefit (%)") +
+    theme_classic()
+
+ggsave(paste0(out_path, "/Sensitivity1.png"), 
+       plot = last_plot(), 
+       width=8, height=5)
+
 ############################################
 
-########### FIG 1: OPT TO PARAMS ###########
-# 100 sims
+############# SAVE ENVIRONMENT #############
+save.image(paste0(
+    data_path,
+    "/SensitivityData/Opt/Sens1.RData"
+))
+############################################
+
+########### SENSITIVITY 2 LOOP #############
+is_time_based <- TRUE
+
+# Load disturbances and coral obs (.rds made in code/obs_dist_combine.R)
+all_reefs_sf <- readRDS(file = paste0(
+    data_path,
+    "/all_reefs_sf_gaps_filled.rds"
+))
+
+all_reefs_sf <- all_reefs_sf %>%
+    mutate(
+        is_disturbed = (all_reefs_sf$COTS_value >= cots_dist |
+                            all_reefs_sf$Hs4MW_value >= cyc_dist |
+                            all_reefs_sf$DHW_value >= dhw_dist),
+        is_impacted = 0,
+        single_or_compound = NA,
+        dist_type = NA,
+        recov_year = NA,
+        recov_time = NA,
+        r_given_impact = NA
+    )
+
+# SIMULATIONS
+column_names <- c(
+    "sector", "point_loc", "point_id", "num_dist", "num_s_dist", "num_c_dist",
+    "prob_s_dist", "prob_c_dist", "prob_s_impact", "prob_c_impact",
+    "prob_s_recov", "prob_c_recov", "r_single_unmgd", "r_single_mgd",
+    "r_comp_unmgd", "r_comp_mgd", "pr_recov_sing_unmgd", "pr_recov_sing_mgd",
+    "pr_recov_comp_unmgd", "pr_recov_comp_mgd"
+)
+
+# Make a dataframe to store the results
+opt_sensitivity_2 <- expand.grid(
+    recov_yrs = list_recov_yrs,
+    mgmt_benefit = 0.2
+) %>% mutate(
+    expected_recov_reefs_s = NA,
+    expected_recov_reefs_c = NA
+)
+
+for (recov_yrs in list_recov_yrs) {
+    # SINGLE OR COMPOUND DIST
+    # Analyse reefs for single or compound disturbances
+    # Returns event_counts, reef_df, overall_unknown_count
+    sing_comp_list <- analyse_reefs(
+        all_reefs_sf, reef_names,
+        is_time_based, recov_yrs, recov_th, cots_dist,
+        cyc_dist, dhw_dist, infer_baseline, epsilon,
+        baseline_str
+    )
+    
+    # Extract the list elements
+    event_counts <- sing_comp_list[[1]]
+    all_reefs_sf <- sing_comp_list[[2]]
+    reef_df <- sing_comp_list[[3]]
+    overall_unknown_count <- sing_comp_list[[4]]
+    
+    # Calculate probability of reef being in a recovered state
+    reef_df <- p_calculator(reef_df, mgmt_benefit)
+    
+    # Initialise:
+    all_samples <- matrix(NA, nrow = num_samples * n_sims, ncol = length(column_names)) %>%
+        data.frame() # df for all sample reef info
+    colnames(all_samples) <- column_names
+    all_samples <- all_samples %>%
+        mutate(
+            is_managed_single = NA, # column in df for managed/not (single)
+            is_managed_cumul = NA, # column for managed/not (compound)
+            scenario_managed = NA,
+            sim_num = rep(seq(n_sims), each = num_samples) # column for simulation number
+        )
+    
+    # For each simulation,
+    for (sim in 1:n_sims) {
+        # Sample num_samples reefs from reef_df
+        sample_reefs_df <- samplerv2(
+            reef_df, sector_boundaries, sample_reefs, num_samples,
+            is_time_based, recov_th, recov_yrs, cots_dist, cyc_dist,
+            dhw_dist
+        )
+        
+        # Calculate p for the n reefs
+        sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit)
+        
+        from_row <- (sim - 1) * num_samples + 1
+        to_row <- sim * num_samples
+        all_samples[from_row:to_row, 1:length(column_names)] <- sample_reefs_df %>%
+            subset(select = column_names)
+        
+        # Calculate single disturbance solution
+        sing_result <- optimiser_single(sample_reefs_df, mgmt_constraint)
+        
+        # Calculate compound disturbance solution
+        comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint)
+        
+        # Get the reefs to manage from solution
+        sol_s <- get_solution(sing_result, y[i])$value
+        sol_c <- get_solution(comp_result, y[i])$value
+        
+        all_samples[from_row:to_row, "is_managed_single"] <- sol_s
+        all_samples[from_row:to_row, "is_managed_cumul"] <- sol_c
+    }
+    
+    # Calculate the expected number of reefs recovered
+    expected_recov_reefs_s <- all_samples %>%
+        group_by(sim_num) %>%
+        summarise(num_recov_s = 
+                      sum(pr_recov_comp_mgd[all_samples$is_managed_single == 1],
+                          na.rm = TRUE) +
+                      sum(pr_recov_comp_unmgd[all_samples$is_managed_single == 0],
+                          na.rm = TRUE)
+        )
+    
+    expected_recov_reefs_c <- all_samples %>%
+        group_by(sim_num) %>%
+        summarise(num_recov_c = 
+                      sum(pr_recov_comp_mgd[all_samples$is_managed_single == 1],
+                          na.rm = TRUE) +
+                      sum(pr_recov_comp_unmgd[all_samples$is_managed_single == 0],
+                          na.rm = TRUE)
+        )
+    
+    # Save the results
+    sensitivity_row <- which(opt_sensitivity_1$recov_yrs == recov_yrs)
+    opt_sensitivity_2[sensitivity_row, "expected_recov_reefs_s"] <- mean(expected_recov_reefs_s$num_recov_s)
+    opt_sensitivity_2[sensitivity_row, "expected_recov_reefs_c"] <- mean(expected_recov_reefs_c$num_recov_c)
+}
+
+############################################
 
 
+########## FIG 2: OPT TO TIME EST ##########
+opt_sensitivity_2 <- opt_sensitivity_2 %>%
+    mutate(difference = expected_recov_reefs_c - expected_recov_reefs_s)
+
+ggplot(opt_sensitivity_2, aes(x = as.factor(recov_th*100), 
+                              y = as.factor(mgmt_ben*100), 
+                              fill = (difference))) + 
+    geom_tile() +
+    scale_fill_gradient2(midpoint = base_exp_recov, 
+                         low = "red", mid = "white",
+                         high = "blue", space = "Lab" ) +
+    labs(fill = "Difference in expected\nnumber of recovered reefs",
+         x = "Recovery Threshold (%)",
+         y = "Management Benefit (%)") +
+    theme_classic()
+
+ggsave(paste0(out_path, "/Sensitivity2.png"), 
+       plot = last_plot(), 
+       width=8, height=5)
+
+
+############################################
+
+############# SAVE ENVIRONMENT #############
+save.image(paste0(
+    data_path,
+    "/SensitivityData/Opt2.RData"
+))
 ############################################
