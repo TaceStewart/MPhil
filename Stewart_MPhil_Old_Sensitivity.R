@@ -3,7 +3,7 @@
 rm(list = ls())
 
 # Clear plots
-if(!is.null(dev.list())) dev.off()
+if (!is.null(dev.list())) dev.off()
 
 # Clear commands
 cat("\014")
@@ -18,12 +18,11 @@ library(dplyr)
 
 ############## SET VARIABLES ###############
 # Variables
-base_recov_yrs <- 2
 base_recov_th <- 0.75
 base_mgmt_ben <- 0.1
-list_recov_yrs <- c(1, 2, 5, 10)
 list_recov_th <- c(0.5, 0.65, 0.75, 0.85, 1)
 list_mgmt_ben <- c(0.02, 0.05, 0.1, 0.15, 0.3)
+list_recov_yrs <- c(1, 2, 5, 10)
 
 # Set GBR MA names in order from north to south
 manament_area_names <- c("Far Northern Management Area",

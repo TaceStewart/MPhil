@@ -28,7 +28,7 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
 
     # If coral cover at first disturbance is below max_pre_dist_cover*(1 - epsilon)
     if (!is.na(max_pre_dist_cover) &&
-    obs_by_reef$COVER[dist_indices[1]] < max_pre_dist_cover * (1 - epsilon)) {
+      obs_by_reef$COVER[dist_indices[1]] < max_pre_dist_cover * (1 - epsilon)) {
       # Then we have a reef with a baseline
       baseline <- max_pre_dist_cover * (1 - epsilon)
     } else if (infer_baseline) {
@@ -65,12 +65,17 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
       # For each disturbance
       # dist_index <- dist_indices[1] # for testing
       for (dist_index in dist_indices) {
+        if (dist_index > 2 &&
+            is.na(max_pre_dist_cover)) {
+          max_pre_dist_cover <- max(obs_by_reef$COVER[1:dist_index - 1])
+        }
+
         # Check if there's a new baseline
-        if (max(obs_by_reef$COVER[1:dist_index - 1]) > max_pre_dist_cover) {
+        if (dist_index > 2 &&
+          max(obs_by_reef$COVER[1:dist_index - 1]) > max_pre_dist_cover) {
           max_pre_dist_cover <- max(obs_by_reef$COVER[1:dist_index - 1])
           baseline <- max_pre_dist_cover * (1 - epsilon)
         }
-
         # If we need to skip this disturbance as it was already counted in the last one
         if (skip_next > 0) {
           # Take one from the skip variable and move on

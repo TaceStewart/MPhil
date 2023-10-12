@@ -30,6 +30,7 @@ library(latex2exp) # LaTeX for ggplot
 library(patchwork)
 library(ggbump) # Delete in not using for opt vis 2
 library(GGally)
+library(pracma)
 
 # Load disturbance and recovery calculators
 source("Stewart_MPhil_single_or_compound.R")
@@ -79,7 +80,7 @@ sector_boundaries <- st_read(shapefile_path,
 
 ###### SET VARIABLES TO CHANGE ON RUN ######
 # Should the baseline be inferred if non-existent at start of obs period?
-infer_baseline <- 0
+infer_baseline <- 1
 epsilon <- 0.05
 baseline_str <- "mean"
 
@@ -99,7 +100,7 @@ recov_th <- 0.75
 # Management benefit (currently % added to mgd reef recovery rate)
 mgmt_benefit <- 0.2
 
-# Management constraint (base: 30% of number of reefs in system)
+# Management constraint (base: 20% of number of reefs in system)
 mgmt_constraint <- 0.20
 
 ### Sensitivity values ###
