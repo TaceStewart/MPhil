@@ -310,7 +310,7 @@ opt_vis_1_df <- data.frame(
   variable = c("Single Only - Perceived", "Single Only - Actual", "Single and Cumulative", "No Management"),
   value = c(
     sum(c(sample_reefs_df$pr_recov_sing_mgd[sample_reefs_df$is_managed_single == 1],
-        sample_reefs_df$pr_recov_sing_unmgd[sample_reefs_df$is_managed_single == 0])),
+          sample_reefs_df$pr_recov_sing_unmgd[sample_reefs_df$is_managed_single == 0])),
     sum(c(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_single == 1], 
           sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_single == 0])),
     sum(c(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_cumul == 1],
@@ -417,15 +417,21 @@ opt_vis_2_df <- data.frame(
   diff_prob_recov_c = sample_reefs_df$diff_prob_recov_c,
   position_s = NA,
   position_c = NA,
-  sector = sample_reefs_df$sector
+  sector = sample_reefs_df$sector,
+  scenario_managed = sample_reefs_df$scenario_managed
 )
-opt_vis_2_df$position_s <- rank(opt_vis_2_df$diff_prob_recov_s, ties.method = "random")
-opt_vis_2_df$position_c <- rank(opt_vis_2_df$diff_prob_recov_c, ties.method = "random")
+opt_vis_2_df$position_s <- rank(length(opt_vis_2_df$diff_prob_recov_s) -
+                                  opt_vis_2_df$diff_prob_recov_s,
+                                ties.method = "random")
+opt_vis_2_df$position_c <- rank(length(opt_vis_2_df$diff_prob_recov_c) - 
+                                  opt_vis_2_df$diff_prob_recov_c, 
+                                ties.method = "random")
+opt_vis_2_df$change <- opt_vis_2_df$position_c - opt_vis_2_df$position_s
 
 # Melt the dataframe so that there is one position column and another column for the scenario
 opt_vis_2_df <- melt(
   opt_vis_2_df,
-  id.vars = c("point_id", "sector"),
+  id.vars = c("point_id", "sector", "scenario_managed", "change"),
   measure.vars = c("position_s", "position_c"),
   variable.name = "scenario",
   value.name = "position"
@@ -437,43 +443,84 @@ opt_vis_2_df <- opt_vis_2_df %>%
 
 # Make visualisation 2: Bump Chart of the prioritisation of reefs in both management scenarios
 # Reefs are ordered by the difference in probability of being in a recovered state when managed/not
+cols_vis_2 <- c("Never selected\nfor management" = "grey",
+                "Single Only" = "steelblue1",
+                "Single and Cumulative" = "steelblue4",
+                "Both" = "purple")
 opt_vis_2 <- ggplot(opt_vis_2_df, aes(x = scenario, 
                                       y = as.numeric(position), 
-                                      color = gsub("Management Area", "", sector),
+                                      color = scenario_managed,
                                       group = point_id)) +
-  geom_bump(linewidth = 1,
-            alpha = 0.5) +
-  geom_point(size = 2) +
+  geom_bump(linewidth = 1.15,
+            alpha = 0.65) +
+  geom_point(size = 2,
+             alpha = 0.75) +
   theme_void() +
-  geom_text(data = opt_vis_2_df %>% filter(scenario == "position_s"),
-            aes(label = position, 
-                x = 0.75),
-            size = 3, hjust = "middle", col = "steelblue1") +
-  geom_text(data = opt_vis_2_df %>% filter(scenario == "position_c"),
-            aes(label = position, 
-                x = 2.25),
-            size = 3, hjust = "left", col = "steelblue4") +
   theme(
-    legend.position = "right",
+    legend.position = "bottom",
     legend.background = element_blank(),
     legend.box.background = element_rect(colour = "azure3"),
-    legend.justification = c("left", "centre"),
-    legend.box.just = "left",
-    legend.margin = margin(5, 10, 5, 5),
-    axis.title = element_text(size = 11),
-    axis.text.x = element_text(size = 9),
-    axis.text.y = element_blank()
+    legend.box = "horizontal",
+    legend.margin = margin(c(1,1,1,1), unit = "mm"),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14,
+                                angle = 90),
+    axis.text.x = element_text(size = 12,
+                               hjust = c(0, 1)),
+    axis.text.y = element_blank(),
+    plot.tag = element_text(size = 14)
   ) +
-  scale_color_brewer(palette = "RdYlGn") +
+  scale_color_manual(values = cols_vis_2) +
   labs(
-    x = "Management Scenario",
+    x = "Disturbances Considered in Planning Model",
     y = "Reef Priority",
-    color = "GBRMPA Management Area"
+    color = "Model/s Reef is Selected for Management",
+    tag = "A"
   ) +
-  scale_y_reverse() +
   scale_x_discrete(labels = c("position_s" = "Single Only",
-                              "position_c" = "Single and\nCumulative"),
-                   expand = c(0, 0.3))
+                              "position_c" = "Single and Cumulative"),
+                   expand = c(0.02, 0.02),
+                   position = "top") +
+  scale_y_continuous(expand = c(0.01, 0.01),
+                     trans = "reverse") +
+  guides(colour = guide_legend(title.position="top", 
+                               title.hjust = 0.5,
+                               nrow = 1))
+opt_vis_2_2 <- ggplot(data = opt_vis_2_df, 
+                      mapping = aes(y = change)) +
+  geom_histogram(bins = 50,
+                 fill = "steelblue4",
+                 colour = "black") +
+  scale_y_continuous(breaks = seq(round(min(opt_vis_2_df$change), digits = -2), 
+                                  round(max(opt_vis_2_df$change), digits = -2), 
+                                  by = 10)) +
+  scale_x_continuous(breaks = seq(0, 20, by = 2)) +
+  geom_hline(yintercept = 0,
+             colour = "red",
+             linewidth = 1) +
+  labs(y = "Change in Priority When Incorporating Cumulative Disturbances",
+       x = "Number of Reefs",
+       tag = "B") +
+  geom_text(x = 14.5,
+            y = 5,
+            label = "Increase in Priority",
+            colour = "grey30",
+            size = 4) +
+  geom_text(x = 14.5,
+            y = -4,
+            label = "Decrease in Priority",
+            colour = "grey30",
+            size = 4) +
+  theme_pubclean() + 
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        plot.tag = element_text(size = 14))
+ggarrange(opt_vis_2, opt_vis_2_2,
+          ncol = 2, nrow = 1,
+          common.legend = FALSE
+)
 
 # Save plot
 if (is_time_based) {
@@ -482,7 +529,7 @@ if (is_time_based) {
       out_path, "/OptVis2_TimeBased",
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
-    plot = opt_vis_2, width = 5, height = 8
+    plot = last_plot(), width = 12, height = 7
   )
 } else {
   ggsave(
@@ -490,7 +537,7 @@ if (is_time_based) {
       out_path, "/OptVis2_RecovBased",
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
-    plot = opt_vis_2, width = 5, height = 8
+    plot = last_plot(), width = 12, height = 7
   )
 }
 
@@ -693,10 +740,11 @@ single_plot <- ggplot() +
     na.rm = TRUE,
     geom = "hex"
   ) +
-  scale_fill_continuous(limits = c(
-    min(p$value, q$value),
-    max(p$value, q$value)
-  )) +
+  scale_fill_gradient2(limits = c(min(p$value, q$value),
+                                  max(p$value, q$value)),
+                       low = "white",
+                       mid = "steelblue1",
+                       high = "steelblue4") +
   labs(fill = "Average Number of \nManaged Reefs")
 
 compound_plot <- ggplot() +
@@ -716,10 +764,11 @@ compound_plot <- ggplot() +
     geom = "hex"
   ) +
   theme(plot.tag = element_text()) +
-  scale_fill_continuous(limits = c(
-    min(p$value, q$value),
-    max(p$value, q$value)
-  )) +
+  scale_fill_gradient2(limits = c(min(p$value, q$value),
+                                  max(p$value, q$value)),
+                       low = "white",
+                       mid = "steelblue1",
+                       high = "steelblue4") +
   theme(plot.tag = element_text())
 
 opt_vis_4 <- ggarrange(single_plot, compound_plot,
@@ -727,7 +776,7 @@ opt_vis_4 <- ggarrange(single_plot, compound_plot,
                        common.legend = TRUE,
                        legend = "right"
 )
-
+opt_vis_4
 if (is_time_based) {
   ggsave(
     paste0(
