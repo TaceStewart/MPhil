@@ -1,7 +1,7 @@
 analyse_reefs <- function(
-    all_reefs_sf, reef_names, is_time_based,
-    recov_yrs, recov_th, cots_dist, cyc_dist,
-    dhw_dist, infer_baseline, epsilon, baseline_str) {
+        all_reefs_sf, reef_names, is_time_based,
+        recov_yrs, recov_th, cots_dist, cyc_dist,
+        dhw_dist, infer_baseline, epsilon, baseline_str) {
     # Initialise dataframe of disturbance type and counts
     event_counts <- data.frame(
         H = 0,
@@ -18,7 +18,7 @@ analyse_reefs <- function(
         HCo = 0,
         Other = 0
     )
-
+    
     # Initialise dataframe for reef information
     reef_df <- data.frame(
         reef_name = character(),
@@ -35,10 +35,10 @@ analyse_reefs <- function(
         prob_c_recov = double(),
         reef_unknown = integer()
     )
-
+    
     # Initialise overall unknown count
     overall_unknown_count <- 0
-
+    
     # Run code for each reef
     for (reef_name in reef_names) {
         # Extract reef obs for named reef
@@ -79,72 +79,92 @@ analyse_reefs <- function(
         prob_s_dist <- num_single / yrs_obsvd
         # Prob Impacted given disturbance: P(A|B) = P(A & B)/P(B)
         prob_s_impact <- ifelse(num_single == 0,
-            NA,
-            sum(single_dist$is_impacted & single_dist$is_disturbed,
-                na.rm = TRUE
-            ) /
-                sum(single_dist$is_disturbed,
-                    na.rm = TRUE
-                )
+                                NA,
+                                sum(single_dist$is_impacted & single_dist$is_disturbed,
+                                    na.rm = TRUE
+                                ) /
+                                    sum(single_dist$is_disturbed,
+                                        na.rm = TRUE
+                                    )
         )
-        prob_s_recov <- ifelse(any(!is.na(single_dist$r_given_impact)),
-            mean(single_dist$r_given_impact, na.rm = TRUE),
-            NA
+        prob_s_recov <- ifelse(any(!is.na(single_dist$r_given_impact)) && 
+                                       !is.na(sd(single_dist$r_given_impact[!is.na(single_dist$r_given_impact)], 
+                                                 na.rm = TRUE)),
+                               rnorm(1, 
+                                     mean(single_dist$r_given_impact[!is.na(single_dist$r_given_impact)], na.rm = TRUE), 
+                                     sd(single_dist$r_given_impact[!is.na(single_dist$r_given_impact)], na.rm = TRUE)
+                               ),
+                               NA
         )
+        if (!is.na(prob_s_recov) && prob_s_recov < 0) {
+            prob_s_recov <- 0
+        } else if (!is.na(prob_s_recov) && prob_s_recov > 1) {
+            prob_s_recov <- 1
+        }
         comp_dist <- obs_by_reef %>%
             filter(single_or_compound == "Compound")
         num_comp <- nrow(comp_dist)
         prob_c_dist <- num_comp / yrs_obsvd
         prob_c_impact <- ifelse(num_comp == 0,
-            NA,
-            sum(comp_dist$is_impacted & comp_dist$is_disturbed,
-                na.rm = TRUE
-            ) /
-                sum(comp_dist$is_disturbed,
-                    na.rm = TRUE
-                )
+                                NA,
+                                sum(comp_dist$is_impacted & comp_dist$is_disturbed,
+                                    na.rm = TRUE
+                                ) /
+                                    sum(comp_dist$is_disturbed,
+                                        na.rm = TRUE
+                                    )
         )
-        prob_c_recov <- ifelse(any(!is.na(comp_dist$r_given_impact)),
-            mean(comp_dist$r_given_impact, na.rm = TRUE),
-            NA
+        prob_c_recov <- ifelse(any(!is.na(comp_dist$r_given_impact)) && 
+                                       !is.na(sd(comp_dist$r_given_impact[!is.na(comp_dist$r_given_impact)], 
+                                                 na.rm = TRUE)),
+                               rnorm(1, 
+                                     mean(comp_dist$r_given_impact[!is.na(comp_dist$r_given_impact)], na.rm = TRUE), 
+                                     sd(comp_dist$r_given_impact[!is.na(comp_dist$r_given_impact)], na.rm = TRUE)
+                               ),
+                               NA
         )
+        if (!is.na(prob_c_recov) && prob_c_recov < 0) {
+            prob_c_recov <- 0
+        } else if (!is.na(prob_c_recov) && prob_c_recov > 1) {
+            prob_c_recov <- 1
+        }
         # Get count of events for the reef and add to total event_counts df
         event_counts_rf <- c(
             H = sum(obs_by_reef$dist_type == "Heat Stress",
-                na.rm = TRUE
+                    na.rm = TRUE
             ),
             Cy = sum(obs_by_reef$dist_type == "Wind Stress",
-                na.rm = TRUE
+                     na.rm = TRUE
             ),
             Co = sum(obs_by_reef$dist_type == "CoTS Outbreak",
-                na.rm = TRUE
+                     na.rm = TRUE
             ),
             HH = sum(obs_by_reef$dist_type == "Heat Stress, Heat Stress",
-                na.rm = TRUE
+                     na.rm = TRUE
             ),
             HCy = sum(obs_by_reef$dist_type == "Heat Stress, Wind Stress",
-                na.rm = TRUE
+                      na.rm = TRUE
             ),
             CyH = sum(obs_by_reef$dist_type == "Wind Stress, Heat Stress",
-                na.rm = TRUE
+                      na.rm = TRUE
             ),
             CyCy = sum(obs_by_reef$dist_type == "Wind Stress, Wind Stress",
-                na.rm = TRUE
+                       na.rm = TRUE
             ),
             CyCo = sum(obs_by_reef$dist_type == "Wind Stress, CoTS Outbreak",
-                na.rm = TRUE
+                       na.rm = TRUE
             ),
             CoCy = sum(obs_by_reef$dist_type == "CoTS Outbreak, Wind Stress",
-                na.rm = TRUE
+                       na.rm = TRUE
             ),
             CoCo = sum(obs_by_reef$dist_type == "CoTS Outbreak, CoTS Outbreak",
-                na.rm = TRUE
+                       na.rm = TRUE
             ),
             CoH = sum(obs_by_reef$dist_type == "CoTS Outbreak, Heat Stress",
-                na.rm = TRUE
+                      na.rm = TRUE
             ),
             HCo = sum(obs_by_reef$dist_type == "Heat Stress, CoTS Outbreak",
-                na.rm = TRUE
+                      na.rm = TRUE
             ),
             Other = 0
         )
@@ -154,12 +174,12 @@ analyse_reefs <- function(
         event_counts <- event_counts + event_counts_rf
         reef_unknown <- sum(grepl("Unknown", obs_by_reef$recov_year), na.rm = TRUE)
         overall_unknown_count <- overall_unknown_count + reef_unknown
-
+        
         ## Get latitude & longitude
         coordinates <- st_coordinates(obs_by_reef$geometry)
         latitude <- coordinates[1, 2]
         longitude <- coordinates[1, 1]
-
+        
         ## Add all relevant information to data frame
         new_row <- c(
             reef_name, # reef or reef & site name
@@ -180,7 +200,7 @@ analyse_reefs <- function(
         # Replace all_reefs_sf with new info
         all_reefs_sf[all_reefs_sf$REEF_NAME == reef_name, ] <- obs_by_reef
     }
-
+    
     # Return a list of the event counts and reef information dataframes
     return(list(event_counts = event_counts, all_reefs_sf = all_reefs_sf, reef_df = reef_df, overall_unknown_count = overall_unknown_count))
 }

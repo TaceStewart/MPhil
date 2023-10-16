@@ -97,23 +97,20 @@ recov_yrs <- 5
 #  Note: for recovery-overlap compounding only
 recov_th <- 0.75
 
-# Management benefit (currently % added to mgd reef recovery rate)
-mgmt_benefit <- 0.2
+# Management benefit 
+# (currently % added to mgd reef recovery rate)
+# NEW (% of annual prob not recovering)
+mgmt_benefit <- 0.5
 
 # Management constraint (base: 20% of number of reefs in system)
-mgmt_constraint <- 0.20
-
-### Sensitivity values ###
-sens_recov_yrs <- c(1, 2, 5, 10, 15)
-sens_recov_th <- c(0.5, 0.65, 0.75, 0.85, 1)
-sens_mgmt_ben <- c(0.02, 0.05, 0.1, 0.15, 0.3)
+mgmt_constraint <- 0.2
 
 ### Simulations ###
-# Run simulations? (Much faster if you don"t)
+# Run simulations? (Much faster if you don't)
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 100 #try 10000
+n_sims <- 10 #try 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -320,26 +317,17 @@ opt_vis_1_df <- data.frame(
   )
 )
 
-# Add inset plot to vis 1: simple bar chart
-# of the difference in expected number of reefs in a recovered state for single and cumulative scenario
-# compared to no management
-opt_vis_1_df_2 <- data.frame(
-  sing_or_cumul = c("Single Only", "Single and Cumulative"),
-  variable = c("Single Only", "Single and Cumulative"),
-  value = c(
-    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_single == 1]) +
-      sum(sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_single == 0]) -
-      sum(sample_reefs_df$pr_recov_comp_unmgd),
-    sum(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_cumul == 1]) +
-      sum(sample_reefs_df$pr_recov_comp_unmgd[sample_reefs_df$is_managed_cumul == 0]) -
-      sum(sample_reefs_df$pr_recov_comp_unmgd)
-  )
-)
-cols_1_3 <- c("Single Only" = "steelblue1", 
-              "Single and Cumulative" = "steelblue4")
+cols_1_3 <- c("Single Only - Actual" = "steelblue1", 
+              "Single and Cumulative" = "steelblue4",
+              "Single Only - Perceived" = "lightblue",
+              "No Management" = "grey")
+model_indices <- which(opt_vis_1_df$variable %in% 
+                         c("Single Only - Actual",
+                           "Single and Cumulative"))
+no_mgmt <- opt_vis_1_df$value[opt_vis_1_df$variable == "No Management"]
 opt_vis_1_3 <- ggplot() +
   geom_bar(
-    data = opt_vis_1_df_2,
+    data = opt_vis_1_df,
     aes(
       x = sing_or_cumul,
       y = value,
@@ -348,7 +336,7 @@ opt_vis_1_3 <- ggplot() +
     stat = "identity",
     position = position_identity()
   ) +
-  geom_text(data = opt_vis_1_df_2, 
+  geom_text(data = opt_vis_1_df, 
             aes(x = sing_or_cumul,
                 y = 0.25,
                 label = round(value, 2)), 
@@ -368,10 +356,6 @@ opt_vis_1_3 <- ggplot() +
     plot.title = element_text(size = 10,
                               hjust = 0.5),
     legend.position = "none"
-    # legend.position = "bottom",
-    # legend.text = element_text(size = 6),
-    # legend.box.margin = margin(0, 0, 0, 0),
-    # legend.box.spacing = unit(0, "cm")
   ) +
   scale_fill_manual(
     name = "",
@@ -390,7 +374,7 @@ if (is_time_based) {
       out_path, "/OptVis1_2_TimeBased",
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
-    plot = last_plot(), width = 5, height = 5
+    plot = last_plot(), width = 6, height = 5
   )
 } else {
   ggsave(
@@ -398,7 +382,7 @@ if (is_time_based) {
       out_path, "/OptVis1_2_RecovBased",
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
-    plot = last_plot(), width = 5, height = 5
+    plot = last_plot(), width = 6, height = 5
   )
 }
 
@@ -421,6 +405,15 @@ opt_vis_2_df <- data.frame(
   sector = sample_reefs_df$sector,
   scenario_managed = sample_reefs_df$scenario_managed
 )
+opt_vis_2_w_ties_s <- rank(length(opt_vis_2_df$diff_prob_recov_s) -
+                           opt_vis_2_df$diff_prob_recov_s)
+opt_vis_2_w_ties_c <- rank(length(opt_vis_2_df$diff_prob_recov_c) -
+                             opt_vis_2_df$diff_prob_recov_c)
+a <- data.frame(opt_vis_2_df$diff_prob_recov_s, 
+                opt_vis_2_w_ties_s, 
+                opt_vis_2_df$diff_prob_recov_c,
+                opt_vis_2_w_ties_c)
+
 opt_vis_2_df$position_s <- rank(length(opt_vis_2_df$diff_prob_recov_s) -
                                   opt_vis_2_df$diff_prob_recov_s,
                                 ties.method = "random")
@@ -759,10 +752,15 @@ single_plot <- ggplot() +
                        low = "white",
                        mid = "steelblue1",
                        high = "steelblue4") +
-  geom_text(x = 1, y = 1,
-            size = 5,
-            label = paste("Average", expression("E[R_1] ="), mean())) +
-  labs(fill = "Average Number of \nManaged Reefs")
+  geom_text(aes(x = 146, y = -24,
+                label = TeX(
+                  paste("Average $E[R_1] = $",
+                        round(opt_vis_4$value[opt_vis_4$sing_or_cumul == "Single Only"], 2)), 
+                  output = "character")),
+            size = 12/.pt,
+            parse = TRUE) +
+  labs(fill = "Average Number of \nManaged Reefs") +
+  theme(plot.tag = element_text())
 
 compound_plot <- ggplot() +
   geom_sf(data = sector_boundaries, lwd = 0.01) +
@@ -786,6 +784,14 @@ compound_plot <- ggplot() +
                        low = "white",
                        mid = "steelblue1",
                        high = "steelblue4") +
+  geom_text(aes(x = 146, y = -24,
+                label = TeX(
+                  paste("Average $E[R_2] = $",
+                        round(opt_vis_4$value[opt_vis_4$sing_or_cumul == "Single and Cumulative"], 2)), 
+                  output = "character")),
+            size = 12/.pt,
+            parse = TRUE) +
+  labs(fill = "Average Number of \nManaged Reefs") +
   theme(plot.tag = element_text())
 
 opt_vis_4 <- ggarrange(single_plot, compound_plot,
@@ -801,7 +807,7 @@ if (is_time_based) {
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
     plot = opt_vis_4,
-    width = 8, height = 5
+    width = 9, height = 5
   )
 } else {
   ggsave(
@@ -810,7 +816,7 @@ if (is_time_based) {
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
     plot = opt_vis_4,
-    width = 8, height = 5
+    width = 9, height = 5
   )
 }
 

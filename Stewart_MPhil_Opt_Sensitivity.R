@@ -118,7 +118,7 @@ is_time_based <- FALSE
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 10 # try 10000
+n_sims <- 1 # try 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
