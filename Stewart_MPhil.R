@@ -110,7 +110,7 @@ mgmt_constraint <- 0.2
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 10 #try 10000
+n_sims <- 100 #try 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -257,7 +257,7 @@ for (i in seq_len(nrow(sample_reefs_df))) {
   if (sample_reefs_df$is_managed_single[i] == 0 && sample_reefs_df$is_managed_cumul[i] == 0) {
     sample_reefs_df$scenario_managed[i] <- "Never selected\nfor management"
   } else if (sample_reefs_df$is_managed_single[i] == 1 && sample_reefs_df$is_managed_cumul[i] == 0) {
-    sample_reefs_df$scenario_managed[i] <- "Single Only"
+    sample_reefs_df$scenario_managed[i] <- "General"
   } else if (sample_reefs_df$is_managed_single[i] == 0 && sample_reefs_df$is_managed_cumul[i] == 1) {
     sample_reefs_df$scenario_managed[i] <- "Single and Cumulative"
   } else if (sample_reefs_df$is_managed_single[i] == 1 && sample_reefs_df$is_managed_cumul[i] == 1) {
@@ -265,7 +265,7 @@ for (i in seq_len(nrow(sample_reefs_df))) {
   }
 }
 
-cols <- c("Single Only" = "steelblue1", 
+cols <- c("General" = "steelblue1", 
           "Single and Cumulative" = "steelblue4",
           "Both" = "#945cee",
           "Never selected\nfor management" = "grey")
@@ -304,9 +304,9 @@ opt_vis_1_1 <- ggplot() +
 
 # Create df for subsetted plot
 opt_vis_1_df <- data.frame(
-  sing_or_cumul = c("Single Only", "Single Only", "Single and Cumulative", "No Management"),
-  variable = c("Single Only - Perceived", "Single Only - Actual", "Single and Cumulative", "No Management"),
-  value = c(
+  dist_cons = c("General", "Single and Cumulative", "Single and Cumulative", "None"),
+  mgmt_plan = c("General - Perceived", "General - Actual", "Single and Cumulative", "None"),
+  benefit_value = c(
     sum(c(sample_reefs_df$pr_recov_sing_mgd[sample_reefs_df$is_managed_single == 1],
           sample_reefs_df$pr_recov_sing_unmgd[sample_reefs_df$is_managed_single == 0])),
     sum(c(sample_reefs_df$pr_recov_comp_mgd[sample_reefs_df$is_managed_single == 1], 
@@ -317,32 +317,28 @@ opt_vis_1_df <- data.frame(
   )
 )
 
-cols_1_3 <- c("Single Only - Actual" = "steelblue1", 
+cols_1_3 <- c("General - Actual" = "steelblue1", 
               "Single and Cumulative" = "steelblue4",
-              "Single Only - Perceived" = "lightblue",
-              "No Management" = "grey")
-model_indices <- which(opt_vis_1_df$variable %in% 
-                         c("Single Only - Actual",
-                           "Single and Cumulative"))
-no_mgmt <- opt_vis_1_df$value[opt_vis_1_df$variable == "No Management"]
+              "General - Perceived" = "lightblue",
+              "None" = "grey")
 opt_vis_1_3 <- ggplot() +
   geom_bar(
-    data = opt_vis_1_df,
+    data = opt_vis_1_df[c(2:4),],
     aes(
-      x = sing_or_cumul,
-      y = value,
-      fill = variable
+      x = reorder(mgmt_plan, benefit_value),
+      y = benefit_value,
+      fill = mgmt_plan
     ),
     stat = "identity",
     position = position_identity()
   ) +
-  geom_text(data = opt_vis_1_df, 
-            aes(x = sing_or_cumul,
-                y = 0.25,
-                label = round(value, 2)), 
+  geom_text(data = opt_vis_1_df[c(2:4),], 
+            aes(x = mgmt_plan,
+                y = 15,
+                label = round(benefit_value, 2)), 
             vjust = 1,
             col = "white",
-            size = 8) +
+            size = 12 / .pt) +
   theme_classic() +
   theme(
     panel.grid.minor = element_blank(),
@@ -359,10 +355,11 @@ opt_vis_1_3 <- ggplot() +
   ) +
   scale_fill_manual(
     name = "",
-    values = cols_1_3
+    values = cols_1_3[c(1,2,4)]
   ) +
+  scale_x_discrete(labels = c("None", "General", "Single and\nCumulative")) +
   labs(
-    x = "Disturbances Considered",
+    x = "Management Plan",
     title = "Number of Reefs Considered\nRecovered Due to Management"
   )
 opt_vis_1_1 + inset_element(opt_vis_1_3, 0.5, 0.6, 0.925, 0.925)
@@ -374,7 +371,7 @@ if (is_time_based) {
       out_path, "/OptVis1_2_TimeBased",
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
-    plot = last_plot(), width = 6, height = 5
+    plot = last_plot(), width = 8, height = 5
   )
 } else {
   ggsave(
@@ -382,7 +379,7 @@ if (is_time_based) {
       out_path, "/OptVis1_2_RecovBased",
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
-    plot = last_plot(), width = 6, height = 5
+    plot = last_plot(), width = 8, height = 5
   )
 }
 
@@ -438,7 +435,7 @@ opt_vis_2_df <- opt_vis_2_df %>%
 # Make visualisation 2: Bump Chart of the prioritisation of reefs in both management scenarios
 # Reefs are ordered by the difference in probability of being in a recovered state when managed/not
 cols_vis_2 <- c("Never selected\nfor management" = "grey",
-                "Single Only" = "steelblue1",
+                "General" = "steelblue1",
                 "Single and Cumulative" = "steelblue4",
                 "Both" = "purple")
 opt_vis_2 <- ggplot(opt_vis_2_df, aes(x = scenario, 
@@ -473,7 +470,7 @@ opt_vis_2 <- ggplot(opt_vis_2_df, aes(x = scenario,
     color = "Model/s Reef is Selected for Management",
     tag = "A"
   ) +
-  scale_x_discrete(labels = c("position_s" = "Single Only",
+  scale_x_discrete(labels = c("position_s" = "General",
                               "position_c" = "Single and Cumulative"),
                    expand = c(0.02, 0.02),
                    position = "top") +
@@ -595,7 +592,7 @@ for (i in seq_len(nrow(all_samples))) {
   if (all_samples$is_managed_single[i] == 0 && all_samples$is_managed_cumul[i] == 0) {
     all_samples$scenario_managed[i] <- "Never selected\nfor management"
   } else if (all_samples$is_managed_single[i] == 1 && all_samples$is_managed_cumul[i] == 0) {
-    all_samples$scenario_managed[i] <- "Single Only"
+    all_samples$scenario_managed[i] <- "General"
   } else if (all_samples$is_managed_single[i] == 0 && all_samples$is_managed_cumul[i] == 1) {
     all_samples$scenario_managed[i] <- "Single and Cumulative"
   } else if (all_samples$is_managed_single[i] == 1 && all_samples$is_managed_cumul[i] == 1) {
@@ -719,8 +716,8 @@ p <- ggplot_build(single_plot)$data[[2]]
 q <- ggplot_build(compound_plot)$data[[2]]
 
 opt_vis_4 <- data.frame(
-  sing_or_cumul = c("Single Only", "Single and Cumulative"),
-  variable = c("Single Only", "Single and Cumulative"),
+  sing_or_cumul = c("General", "Single and Cumulative"),
+  variable = c("General", "Single and Cumulative"),
   value = c(
     sum(c(all_samples$pr_recov_comp_mgd[all_samples$is_managed_single == 1],
           all_samples$pr_recov_comp_unmgd[all_samples$is_managed_single == 0])) / 
@@ -755,7 +752,7 @@ single_plot <- ggplot() +
   geom_text(aes(x = 146, y = -24,
                 label = TeX(
                   paste("Average $E[R_1] = $",
-                        round(opt_vis_4$value[opt_vis_4$sing_or_cumul == "Single Only"], 2)), 
+                        round(opt_vis_4$value[opt_vis_4$sing_or_cumul == "General"], 2)), 
                   output = "character")),
             size = 12/.pt,
             parse = TRUE) +
