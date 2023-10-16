@@ -110,7 +110,7 @@ mgmt_constraint <- 0.2
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 100 #try 10000
+n_sims <- 10000 #try 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -494,16 +494,16 @@ opt_vis_2_2 <- ggplot(data = opt_vis_2_df,
   labs(y = "Change in Priority When Incorporating Cumulative Disturbances",
        x = "Number of Reefs",
        tag = "B") +
-  geom_text(x = 14.5,
-            y = 5,
+  geom_text(x = 9,
+            y = 3.5,
             label = "Increase in Priority",
             colour = "grey30",
-            size = 4) +
-  geom_text(x = 14.5,
-            y = -4,
+            size = 10.5 / .pt) +
+  geom_text(x = 9,
+            y = -7,
             label = "Decrease in Priority",
             colour = "grey30",
-            size = 4) +
+            size = 10.5 / .pt) +
   theme_pubclean() + 
   theme(axis.title = element_text(size = 14),
         axis.text = element_text(size = 12),
