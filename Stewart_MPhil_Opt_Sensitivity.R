@@ -81,9 +81,9 @@ sector_boundaries <- st_read(shapefile_path,
 ############## SET VARIABLES ###############
 # Variables
 base_recov_th <- 0.75
-base_mgmt_ben <- 0.2
+base_mgmt_ben <- 0.5
 list_recov_th <- seq(0.05, 1, by = 0.05)
-list_mgmt_ben <- seq(0, 0.5, by = 0.025)
+list_mgmt_ben <- seq(0, 1, by = 0.1)
 list_recov_yrs <- seq(1, 15, by = 1)
 infer_baseline <- 1 # Should the baseline be inferred if non-existent at start of obs period?
 epsilon <- 0.05
@@ -118,7 +118,7 @@ is_time_based <- FALSE
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 1 # try 10000
+n_sims <- 5 # try 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -167,8 +167,9 @@ opt_sensitivity_1 <- expand.grid(
     recov_th = list_recov_th,
     mgmt_benefit = list_mgmt_ben
 ) %>% mutate(
-    expected_recov_reefs_s = NA,
-    expected_recov_reefs_c = NA
+    expected_recov_s = NA,
+    expected_recov_c = NA,
+    expected_recov_nm = NA
 )
 
 # Make a list to store all simulations
@@ -203,7 +204,6 @@ for (recov_th in list_recov_th) {
         event_counts <- sing_comp_list[[1]]
         all_reefs_sf <- sing_comp_list[[2]]
         reef_df <- sing_comp_list[[3]]
-        overall_unknown_count <- sing_comp_list[[4]]
         
         # Calculate probability of reef being in a recovered state
         reef_df <- p_calculator(reef_df, mgmt_benefit)
@@ -276,44 +276,37 @@ for (recov_th in list_recov_th) {
                               na.rm = TRUE)
             )
         
+        expected_recov_reefs_nm <- all_samples %>%
+            group_by(sim_num) %>%
+            summarise(num_recov_nm = sum(pr_recov_comp_unmgd,
+                                        na.rm = TRUE)
+            )
+        
         # Save the results
         sensitivity_row <- which(opt_sensitivity_1$recov_th == recov_th &
                                      opt_sensitivity_1$mgmt_benefit == mgmt_benefit)
         opt_sensitivity_1[sensitivity_row, "expected_recov_s"] <- mean(expected_recov_reefs_s$num_recov_s)
         opt_sensitivity_1[sensitivity_row, "expected_recov_c"] <- mean(expected_recov_reefs_c$num_recov_c)
+        opt_sensitivity_1[sensitivity_row, "expected_recov_nm"] <- mean(expected_recov_reefs_nm$num_recov_nm)
     }
 }
 ############################################
 
-# for (list_item in 1:length(sens_list_1)) {
-#     all_samples <- sens_list_1[[list_item]]
-#     recov_th <- all_samples$recov_th[1]
-#     mgmt_benefit <- all_samples$mgmt_benefit[1]
-#     expected_recov_reefs_c <- all_samples %>%
-#         group_by(sim_num) %>%
-#         summarise(num_recov_c = 
-#                       sum(all_samples$pr_recov_comp_mgd[all_samples$is_managed_cumul == 1],
-#                           na.rm = TRUE) +
-#                       sum(all_samples$pr_recov_comp_unmgd[all_samples$is_managed_cumul == 0],
-#                           na.rm = TRUE)
-#         )
-#     
-#     sensitivity_row <- which(opt_sensitivity_1$recov_th == recov_th &
-#                                  opt_sensitivity_1$mgmt_benefit == mgmt_benefit)
-#     opt_sensitivity_1[sensitivity_row, "expected_recov_reefs_c"] <- mean(expected_recov_reefs_c$num_recov_c) / n_sims
-# }
-
 ########### FIG 1: OPT TO PARAMS ###########
 opt_sensitivity_1 <- opt_sensitivity_1 %>%
-    mutate(difference = expected_recov_c - expected_recov_s)
+    mutate(difference_s = expected_recov_s - expected_recov_nm,
+           difference_c = expected_recov_c - expected_recov_nm,
+           prop_benefit = ifelse(is.nan(difference_c / difference_s),
+                                 0,
+                                 difference_c / difference_s))
 
 ggplot(opt_sensitivity_1, aes(x = as.factor(recov_th*100), 
                               y = as.factor(mgmt_benefit*100), 
-                              fill = (difference))) + 
+                              fill = (prop_benefit))) + 
     geom_tile() +
     scale_fill_gradient2(low = "red", mid = "white",
                          high = "blue", space = "Lab" ) +
-    labs(fill = "Difference in expected\nnumber of recovered reefs",
+    labs(fill = "Propotional benefit of incorporating\nsingle and cumulative disturbance\nfor expected number of recovered reefs\n(multiple of general benefit)",
          x = "Recovery Threshold (%)",
          y = "Management Benefit (%)") +
     theme_classic()
@@ -334,9 +327,9 @@ save.image(paste0(
 ########### SENSITIVITY 2 LOOP #############
 bc_opt_indx <- which(round(opt_sensitivity_1$recov_th, 2) == base_recov_th &
                          opt_sensitivity_1$mgmt_benefit == base_mgmt_ben)
-base_case_optimal <- opt_sensitivity_1[bc_opt_indx, "expected_recov_reefs_c"]
+base_case_optimal <- opt_sensitivity_1[bc_opt_indx, "expected_recov_c"]
 is_time_based <- TRUE
-mgmt_benefit <- 0.2
+mgmt_benefit <- base_mgmt_ben
 
 # Load disturbances and coral obs (.rds made in code/obs_dist_combine.R)
 all_reefs_sf <- readRDS(file = paste0(
@@ -494,19 +487,19 @@ opt_sensitivity_2 <- opt_sensitivity_2 %>%
            pr_recov_cumul = ifelse(is_managed_cumul == 1,  pr_recov_comp_mgd, pr_recov_comp_unmgd))
 opt_sensitivity_2_fig <- opt_sensitivity_2 %>%
     group_by(sim_num, recov_yrs) %>%
-        summarise(num_recov_s = 
-                      sum(pr_recov_sing,
-                          na.rm = TRUE),
-                    num_recov_c =
-                        sum(pr_recov_cumul,
-                            na.rm = TRUE)
-        )
+    summarise(num_recov_s = 
+                  sum(pr_recov_sing,
+                      na.rm = TRUE),
+              num_recov_c =
+                  sum(pr_recov_cumul,
+                      na.rm = TRUE)
+    )
 
 ggplot(opt_sensitivity_2_fig, aes(x = as.factor(recov_yrs), 
-                              y = num_recov_c - num_recov_s)) + 
+                                  y = num_recov_c - num_recov_s)) + 
     geom_boxplot() +
     labs(x = "Estimated Recovery Time Following Disturbance (Years)",
-         y = "Difference in average\nexpected number of\nrecovered reefs") +
+         y = "Difference in average expected number of recovered reefs") +
     theme_classic()
 
 ggsave(paste0(out_path, "/Sensitivity2.png"), 
