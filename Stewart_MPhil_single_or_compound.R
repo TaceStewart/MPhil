@@ -16,6 +16,7 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
       max(obs_by_reef$Hs4MW_value) < cyc_dist &&
       max(obs_by_reef$DHW_value) < dhw_dist) {
     
+    obs_by_reef$reef_state <- "Not disturbed"
   } else { # If there are disturbances
     # Get indices of disturbance years
     dist_indices <- which(obs_by_reef$is_disturbed)
@@ -135,7 +136,10 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
                 obs_by_reef$recov_year[dist_index] <- "Unknown - no post obs"
               } else {
                 # Find next observation with at least max_pre_dist_cover*recov_th
-                post_rec_index <- which(obs_by_reef$COVER[dist_index:nrow(obs_by_reef)] > max_pre_dist_cover * recov_th)[1] + dist_index - 1
+                post_rec_index <- which(obs_by_reef$COVER[dist_index + 1:nrow(obs_by_reef)] > 
+                                          max_pre_dist_cover * recov_th & 
+                                          obs_by_reef$COVER[dist_index + 1:nrow(obs_by_reef)] >
+                                          min(obs_by_reef$COVER[dist_index:nrow(obs_by_reef) - 1]))[1] + dist_index
                 # If there are no obs with at least recov_th*max_pre_dist_cover
                 if (is.na(post_rec_index)) {
                   obs_by_reef$recov_year[dist_index] <- "Unknown - no post-disturbance growth"
@@ -275,10 +279,10 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
         obs_by_reef$r_given_impact[index] <- 1 / recov_yrs
       } else {
         obs_by_reef$r_given_impact[index] <- ifelse(obs_by_reef$is_impacted[index],
-                                                  1 / (obs_by_reef$recov_time[index]),
-                                                  NA
-      )
-      
+                                                    1 / (obs_by_reef$recov_time[index]),
+                                                    NA
+        )
+        
       }
       
       # If Inf was produced, there was a 0 year recovery time, so r is 100%

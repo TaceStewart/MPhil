@@ -31,6 +31,11 @@ library(patchwork)
 library(ggbump) # Delete in not using for opt vis 2
 library(GGally)
 library(pracma)
+library(leaflet)
+library(leaflet.providers)
+library(htmlwidgets)
+library(htmltools)
+library(webshot)
 
 # Load disturbance and recovery calculators
 source("Stewart_MPhil_single_or_compound.R")
@@ -110,7 +115,7 @@ mgmt_constraint <- 0.2
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 10000 #try 10000
+n_sims <- 100 #try 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -164,6 +169,22 @@ event_counts <- sing_comp_list[[1]]
 all_reefs_sf <- sing_comp_list[[2]]
 reef_df <- sing_comp_list[[3]]
 overall_unknown_count <- sing_comp_list[[4]]
+
+# Determine initial impact years
+impacted_indices <- which(!is.na(all_reefs_sf$single_or_compound))
+all_reefs_sf$reef_state <- ""
+all_reefs_sf$reef_state[impacted_indices] <- paste("Impacted by", 
+                                                   all_reefs_sf$single_or_compound[impacted_indices])
+
+# For recovery times > 1, copy state to corresponding rows at that reef
+
+
+# For reefs where baseline was inferred, state is "Impacted by Unknown" until first impact
+
+
+# All remaining empty cells in all_reefs_sf$reef_state are "Recovered"
+
+
 ############################################
 
 ########### HISTORICAL ANALYSIS ############
@@ -216,6 +237,401 @@ reef_df <- p_calculator(reef_df, mgmt_benefit)
 
 ############################################
 
+############ DATA CHAPTER BG 1 #############
+# GBRMPA Management Areas
+rebe_coords_xy <- all_reefs_sf$geometry[which(grepl("Rebe", 
+                                                    all_reefs_sf$REEF_NAME,
+                                                    ignore.case = T))] %>% 
+  st_coordinates()
+coordinates_xy <- st_coordinates(all_reefs_sf$geometry)
+map_data <- sector_boundaries
+map_data$NUM_REEFS <- 0
+unique_rfs <- unique(all_reefs_sf[, c("REEF_NAME", "AREA_DESCR")])
+for (sector_row in 1:nrow(map_data)) {
+  map_data$NUM_REEFS[sector_row] <- sum(unique_rfs$AREA_DESCR == 
+                                          map_data$AREA_DESCR[sector_row])
+}
+leaflet() %>%
+  setView(lng = mean(coordinates_xy[,1]), 
+          lat = min(coordinates_xy[,2]) +5, 
+          zoom = 5) %>%
+  addProviderTiles("Esri.WorldGrayCanvas") %>%
+  addPolygons(data = map_data, 
+              label = ~paste0(gsub(" Management Area", 
+                                   "",
+                                   AREA_DESCR), " (n = ", NUM_REEFS, ")"),
+              labelOptions = labelOptions(noHide = T, 
+                                          textOnly = TRUE, 
+                                          direction = "right",
+                                          style = list(
+                                            "color" = "grey",
+                                            "font-weight" = "bold",
+                                            "font-size" = "14px"),
+                                          offset = c(38, -15)),
+              color = "grey",
+              opacity = 1,
+              weight = 2) %>%
+  addLabelOnlyMarkers(lng = 140,
+                      lat = -25,
+                      label = "Queensland",
+                      labelOptions = labelOptions(noHide = T, 
+                                                  textOnly = TRUE,
+                                                  style = list(
+                                                    "color" = "grey",
+                                                    "font-weight" = "bold",
+                                                    "font-size" = "12px"))) %>%
+  addCircleMarkers(lng = mean(rebe_coords_xy[,1]),
+                   lat = mean(rebe_coords_xy[,2]),
+                   color = "lightcoral",
+                   opacity = 1,
+                   weight = 4,
+                   radius = 5,
+                   fill = FALSE) %>%
+  addLabelOnlyMarkers(lng = mean(rebe_coords_xy[,1] + 1),
+                      lat = mean(rebe_coords_xy[,2]),
+                      label = "Rebe Reef",
+                      labelOptions = labelOptions(noHide = T, 
+                                                  textOnly = TRUE, 
+                                                  direction = "right",
+                                                  style = list(
+                                                    "color" = "lightcoral",
+                                                    "font-weight" = "bold",
+                                                    "font-size" = "18px"))) %>%
+  saveWidget("gbrmpaMA.html")
+webshot("gbrmpaMA.html", 
+        paste0(out_path, "/DataChapter/Background/BG1.png"),
+        vwidth = 700, vheight = 500, zoom = 8)
+
+############################################
+
+############ DATA CHAPTER BG 2 #############
+# AIMS Monitoring Locations by Program
+unique_rfs <- unique(all_reefs_sf[, c("REEF_NAME", "PROGRAM", "geometry")])
+ggplot() +
+  geom_sf(data = map_data, 
+          lwd = 0.75,
+          color = "darkgrey") +
+  theme_classic() +
+  geom_sf(data = unique_rfs,
+          pch = 19,
+          mapping = aes(colour = PROGRAM),
+          alpha = 0.75) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       colour = "AIMS Program") + 
+  theme(legend.position = c(0.05, 0.05),
+        legend.box.background = element_rect(linewidth = 1, colour = "darkgrey"),
+        legend.justification = c("left", "bottom"),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10))
+ggsave(paste0(out_path, "/DataChapter/Background/BG2.png"), 
+       plot = last_plot(), width = 5, height = 6)
+
+############################################
+
+############ DATA CHAPTER BG 3 #############
+# Three-panel environmental values
+rebe_reef <- all_reefs_sf[which(grepl("REBE", all_reefs_sf$REEF_NAME)),]
+colors <- c("Wind Stress" = "steelblue3", 
+            "Heat Stress" = "lightcoral", 
+            "CoTS Outbreak" = "mediumpurple",
+            "CoTS Outbreak, Wind Stress, Heat Stress" = "aquamarine3")
+bg_3a <- ggplot(data = rebe_reef) +
+  theme_classic() +
+  geom_point(mapping = aes(x = YEAR, 
+                           y = Hs4MW_value,
+                           color = "Wind Stress"),
+             alpha = 0.75,
+             size = 1.5) +
+  geom_line(mapping = aes(x = YEAR, 
+                          y = Hs4MW_value,
+                          color = "Wind Stress"),
+            alpha = 0.75,
+            linewidth = 1) +
+  geom_hline(yintercept = 10,
+             color = "red",
+             linetype = "dashed") +
+  geom_text(x = 1994.75, y = 13.5, 
+            label = "Disturbance\nThreshold") +
+  labs(x = "Year",
+       y = "Hours of 4m+ Wave Height",
+       tag = "A") + 
+  scale_colour_manual(values = colors) +
+  scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
+  theme(legend.position = "None")
+bg_3b <- ggplot(data = rebe_reef) +
+  theme_classic() +
+  geom_point(mapping = aes(x = YEAR, 
+                           y = DHW_value,
+                           color = "Heat Stress"),
+             alpha = 0.75,
+             size = 1.5) +
+  geom_line(mapping = aes(x = YEAR, 
+                          y = DHW_value,
+                          color = "Heat Stress"),
+            alpha = 0.75,
+            linewidth = 1) +
+  geom_hline(yintercept = 4,
+             color = "red",
+             linetype = "dashed") +
+  geom_text(x = 1994.75, y = 4.75, 
+            label = "Disturbance\nThreshold") +
+  labs(x = "Year",
+       y = "Degree Heating Weeks",
+       tag = "B") + 
+  scale_colour_manual(values = colors) +
+  scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
+  scale_y_continuous(limits = c(0, 6), breaks = seq(0, 6, 1)) +
+  theme(legend.position = "None")
+bg_3c <- ggplot(data = rebe_reef) +
+  theme_classic() +
+  geom_point(mapping = aes(x = YEAR, 
+                           y = COTS_value,
+                           color = "CoTS Outbreak"),
+             alpha = 0.75,
+             size = 1.5) +
+  geom_line(mapping = aes(x = YEAR, 
+                          y = COTS_value,
+                          color = "CoTS Outbreak"),
+            alpha = 0.75,
+            linewidth = 1) +
+  geom_hline(yintercept = 1,
+             color = "red",
+             linetype = "dashed") +
+  geom_text(x = 1994.75, y = 1.3, 
+            label = "Disturbance\nThreshold") +
+  labs(x = "Year",
+       y = "Average COTS per Manta-Tow",
+       tag = "C") + 
+  scale_colour_manual(values = colors) +
+  scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
+  theme(legend.position = "None")
+
+# Combine the plots
+ggarrange(bg_3a, bg_3b, bg_3c,
+          ncol = 1, nrow = 3,
+          common.legend = FALSE
+)
+
+# Save
+ggsave(paste0(out_path, "/DataChapter/Background/BG3.png"), 
+       plot = last_plot(), width = 7, height = 8)
+############################################
+
+############ DATA CHAPTER BG 4 #############
+# Two-panel environment/disturbance & cover (update)
+rebe_reef <- all_reefs_sf[which(grepl("REBE", all_reefs_sf$REEF_NAME)),]
+rebe_reef$year_dists <- NA
+dist_names <- c("CoTS Outbreak", "Wind Stress", "Heat Stress")
+for (row in 1: nrow(rebe_reef)) {
+  dist_type <- dist_names[c(rebe_reef$COTS_value[row] >= cots_dist, 
+                            rebe_reef$Hs4MW_value[row] >= cyc_dist, 
+                            rebe_reef$DHW_value[row] >= dhw_dist)]
+  if (length(dist_type > 1)) {
+    dist_type <- paste(dist_type, collapse = ", ")
+    rebe_reef$year_dists[row] <- dist_type
+  }
+}
+rebe_reef$dist_years <- ifelse(is.na(rebe_reef$year_dists), NA, rebe_reef$YEAR)
+colors <- c("Wind Stress" = "steelblue3", 
+            "Heat Stress" = "lightcoral", 
+            "CoTS Outbreak" = "mediumpurple",
+            "CoTS Outbreak, Wind Stress, Heat Stress" = "aquamarine3")
+rebe_reef$dist_years <- ifelse(is.na(rebe_reef$year_dists), NA, rebe_reef$YEAR)
+bg_4a <- ggplot(data = rebe_reef,
+                mapping = aes(x = YEAR, 
+                              y = COVER)) +
+  theme_classic() +
+  geom_point(colour = "azure4",
+             size = 1.5, 
+             alpha = 0.75) +
+  geom_line(colour = "azure4",
+            linewidth = 1,
+            alpha = 0.75) +
+  scale_colour_manual(na.translate = F,
+                      values = colors) +
+  labs(x = "Year",
+       y = "Cover (%)",
+       tag = "A") + 
+  scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
+  scale_y_continuous(limits = c(0,50), 
+                     breaks = seq(0, 50, 10))
+bg_4b <- ggplot(data = rebe_reef) +
+  theme_classic() +
+  geom_point(mapping = aes(x = YEAR,
+                           y = Hs4MW_value / cyc_dist * 100,
+                           color = "Wind Stress"),
+             alpha = 0.75,
+             size = 1.5) +
+  geom_line(mapping = aes(x = YEAR,
+                          y = Hs4MW_value / cyc_dist * 100,
+                          color = "Wind Stress"),
+            alpha = 0.75,
+            linewidth = 1) +
+  geom_point(mapping = aes(x = YEAR, 
+                           y = DHW_value / dhw_dist * 100,
+                           color = "Heat Stress"),
+             alpha = 0.75,
+             size = 1.5) +
+  geom_line(mapping = aes(x = YEAR, 
+                          y = DHW_value / dhw_dist * 100,
+                          color = "Heat Stress"),
+            alpha = 0.75,
+            linewidth = 1) +
+  geom_point(mapping = aes(x = YEAR, 
+                           y = COTS_value / cots_dist * 100,
+                           color = "CoTS Outbreak"),
+             alpha = 0.75,
+             size = 1.5) +
+  geom_line(mapping = aes(x = YEAR, 
+                          y = COTS_value / cots_dist * 100,
+                          color = "CoTS Outbreak"),
+            alpha = 0.75,
+            linewidth = 1) +
+  geom_hline(yintercept = 100,
+             colour = "Red",
+             linetype = "dashed") +
+  scale_colour_manual(values = colors) +
+  labs(x = "Year",
+       y = "% of Disturbance Threshold",
+       tag = "B",
+       colour = "Disturbance Type") + 
+  scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015))
+
+# Combine the plots
+ggarrange(bg_4a, bg_4b,
+          ncol = 1, nrow = 2,
+          common.legend = TRUE,
+          legend = "right"
+)
+
+# Save
+ggsave(paste0(out_path, "/DataChapter/Background/BG4.png"),
+       plot = last_plot(), width = 7, height = 5)
+############################################
+
+############ DATA CHAPTER BG 5 #############
+# Coral cover over time at Rebe Reef, with single and cumulative disturbances
+rebe_reef$dist_years <- ifelse(is.na(rebe_reef$year_dists), NA, rebe_reef$YEAR)
+sing_comp_dist_years <- ifelse(is.na(rebe_reef$single_or_compound), NA, rebe_reef$YEAR)
+ggplot(data = rebe_reef,
+       mapping = aes(x = YEAR, 
+                     y = COVER)) +
+  theme_classic() +
+  geom_rect(xmin = sing_comp_dist_years, 
+            xmax = ifelse(grepl("Unknown", rebe_reef$recov_year), 
+                          Inf,
+                          as.numeric(rebe_reef$recov_year)), 
+            ymin = -Inf, ymax = Inf,
+            mapping = aes(fill = rebe_reef$single_or_compound),
+            alpha = .3,
+            na.rm = TRUE) + 
+  scale_fill_manual(name = "Event Type",
+                    values = c("orange", "yellow"),
+                    na.translate = F) +
+  geom_point(colour = "azure4",
+             size = 1.5,
+             alpha = 0.75) +
+  geom_line(colour = "azure4",
+            linewidth = 1,
+            alpha = 0.75) +
+  geom_vline(mapping = aes(xintercept = rebe_reef$dist_years, 
+                           colour = rebe_reef$year_dists),
+             na.rm = TRUE,
+             linewidth = 1)  + 
+  scale_colour_manual(na.translate = F,
+                      values = colors) +
+  labs(x = "Year",
+       y = "Cover (%)",
+       colour = "Disturbance Type") + 
+  scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
+  scale_y_continuous(limits = c(0,50), 
+                     breaks = seq(0, 50, 10))
+
+# Save
+ggsave(paste0(out_path, "/DataChapter/Background/BG5.png"),
+       plot = last_plot(), width = 7, height = 3)
+############################################
+
+############ DATA CHAPTER VIS 1 ############
+# How often reefs are in each state (new)
+
+
+############################################
+
+############ DATA CHAPTER VIS 2 ############
+# Two-panel spatial map of number of disturbances at each reef (update)
+side_size <- 0.5
+allreefs_xy <- st_coordinates(all_reefs_sf)
+all_reefs_sf$X <- allreefs_xy[,1]
+all_reefs_sf$Y <- allreefs_xy[,2]
+dc_2a <- ggplot() +
+  theme_classic() +
+  geom_sf(data = map_data,
+          size = 0.25,
+          color = "azure4",
+          fill = NA) +
+  geom_hex(data = all_reefs_sf[all_reefs_sf$single_or_compound == "Single",],
+           aes(X, Y),
+           binwidth = c(side_size, side_size),
+           na.rm = TRUE) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       fill = "Number of \nSingle \nDisturbances",
+       tag = "A")
+
+dc_2b <- ggplot() +
+  theme_classic() +
+  geom_sf(data = map_data,
+          size = 0.25,
+          color = "azure4",
+          fill = NA) +
+  geom_hex(data = all_reefs_sf[all_reefs_sf$single_or_compound == "Compound",],
+           aes(X, Y),
+           binwidth = c(side_size, side_size),
+           na.rm = TRUE) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       fill = "Number of \nCumulative \nDisturbances",
+       tag = "B")
+
+p <- ggplot_build(dc_2a)$data[[2]]
+q <- ggplot_build(dc_2b)$data[[2]]
+
+dc_2a <- dc_2a +
+  scale_fill_gradient2(limits = c(min(p$count, q$count),
+                                  max(p$count, q$count)),
+                       low = "white",
+                       mid = "steelblue1",
+                       high = "steelblue4")
+
+dc_2b <- dc_2b +
+  scale_fill_gradient2(limits = c(min(p$count, q$count),
+                                  max(p$count, q$count)),
+                       low = "white",
+                       mid = "steelblue1",
+                       high = "steelblue4")
+
+# Combine the plots
+ggarrange(dc_2a, dc_2b,
+          ncol = 2, nrow = 1,
+          common.legend = TRUE,
+          legend = "right"
+)
+
+# Save
+ggsave(paste0(out_path, "/DataChapter/Results/DC_2.png"),
+       plot = last_plot(), width = 7, height = 3)
+############################################
+
+############ DATA CHAPTER VIS 3 ############
+# Three-panel histogram of number of each type of dist at reefs (new)
+
+
+############################################
+
 ################# SAMPLING #################
 
 sample_reefs_df <- samplerv2(
@@ -264,7 +680,9 @@ for (i in seq_len(nrow(sample_reefs_df))) {
     sample_reefs_df$scenario_managed[i] <- "Both"
   }
 }
+############################################
 
+############ OPT CHAPTER VIS 1 #############
 cols <- c("General" = "steelblue1", 
           "Single and Cumulative" = "steelblue4",
           "Both" = "#945cee",
@@ -382,7 +800,9 @@ if (is_time_based) {
     plot = last_plot(), width = 8, height = 5
   )
 }
+############################################
 
+############ OPT CHAPTER VIS 2 #############
 # Alter sample_reefs_df to have column of difference in probability of being in a recovered state
 # when managed/not
 sample_reefs_df <- sample_reefs_df %>%
@@ -403,7 +823,7 @@ opt_vis_2_df <- data.frame(
   scenario_managed = sample_reefs_df$scenario_managed
 )
 opt_vis_2_w_ties_s <- rank(length(opt_vis_2_df$diff_prob_recov_s) -
-                           opt_vis_2_df$diff_prob_recov_s)
+                             opt_vis_2_df$diff_prob_recov_s)
 opt_vis_2_w_ties_c <- rank(length(opt_vis_2_df$diff_prob_recov_c) -
                              opt_vis_2_df$diff_prob_recov_c)
 a <- data.frame(opt_vis_2_df$diff_prob_recov_s, 
@@ -599,8 +1019,10 @@ for (i in seq_len(nrow(all_samples))) {
     all_samples$scenario_managed[i] <- "Both"
   }
 }
+############################################
 
-opt_result_1 <- all_samples %>%
+############ OPT CHAPTER VIS 3 #############
+opt_result_3_1 <- all_samples %>%
   group_by(scenario_managed) %>%
   summarise(perc = n() / nrow(all_samples))
 
@@ -665,7 +1087,9 @@ if (is_time_based) {
     plot = opt_vis_3, width = 5, height = 5
   )
 }
+############################################
 
+############ OPT CHAPTER VIS 4 #############
 x_single <- st_coordinates(single_vals$point_loc)[, 1]
 y_single <- st_coordinates(single_vals$point_loc)[, 2]
 

@@ -42,7 +42,7 @@ map_data <- st_read(shapefile_path)
 #             "/Parameter Run Environments/RecovBased0.75th0.1mgmt.RData"))
 
 if (inferBaseline) {
-  inferString <- "CS2"
+  inferString <- "BaseCase"
 } else {
   inferString <- "CS1"
 }

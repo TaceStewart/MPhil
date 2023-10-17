@@ -1,4 +1,4 @@
-# Ideally this script will create 1000 samples, find the nearest environmental obs
+# Ideally this script will create 100000 samples, find the nearest environmental obs
 # translate them to disturbance obs, find the nearest coral obs, calculate 
 # d_{i,k} and r_{i,k} and save as a data frame to load into the main program
 
