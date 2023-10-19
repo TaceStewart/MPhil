@@ -545,6 +545,7 @@ ggplot(data = rebe_reef,
             alpha = .3,
             na.rm = TRUE) + 
   scale_fill_manual(name = "Event Type",
+                    labels = c("Single", "Cumulative"),
                     values = c("orange", "yellow"),
                     na.translate = F) +
   geom_point(colour = "azure4",
@@ -655,7 +656,7 @@ dc_2a <- ggplot() +
            na.rm = TRUE) +
   labs(x = "Longitude",
        y = "Latitude",
-       fill = "Number of \nSingle \nDisturbances",
+       fill = "Number of\nDisturbances",
        tag = "A")
 
 dc_2b <- ggplot() +
@@ -670,7 +671,7 @@ dc_2b <- ggplot() +
            na.rm = TRUE) +
   labs(x = "Longitude",
        y = "Latitude",
-       fill = "Number of \nCumulative \nDisturbances",
+       fill = "Number of\nDisturbances",
        tag = "B")
 
 p <- ggplot_build(dc_2a)$data[[2]]
@@ -699,7 +700,7 @@ ggarrange(dc_2a, dc_2b,
 
 # Save
 ggsave(paste0(out_path, "/DataChapter/Results/DC_2.png"),
-       plot = last_plot(), width = 7, height = 3)
+       plot = last_plot(), width = 8, height = 4)
 ############################################
 
 ############ DATA CHAPTER VIS 3 ############
