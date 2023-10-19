@@ -177,13 +177,29 @@ all_reefs_sf$reef_state[impacted_indices] <- paste("Impacted by",
                                                    all_reefs_sf$single_or_compound[impacted_indices])
 
 # For recovery times > 1, copy state to corresponding rows at that reef
-
+for (i in seq_len(nrow(all_reefs_sf))) {
+  if (!is.na(all_reefs_sf$recov_time[i]) & all_reefs_sf$recov_time[i] > 1) {
+    reef_indices <- which(all_reefs_sf$REEF_NAME == all_reefs_sf$REEF_NAME[i] &
+                            all_reefs_sf$YEAR > all_reefs_sf$YEAR[i] &
+                            all_reefs_sf$YEAR <= (all_reefs_sf$YEAR[i] + all_reefs_sf$recov_time[i] - 1))
+    all_reefs_sf$reef_state[reef_indices] <- all_reefs_sf$reef_state[i]
+  }
+}
 
 # For reefs where baseline was inferred, state is "Impacted by Unknown" until first impact
-
+if (infer_baseline == 1) {
+  inferred_reefs <- which(reef_df$baseline_inferred == TRUE)
+  for (i in inferred_reefs) {
+    first_impact <- which(all_reefs_sf$REEF_NAME == reef_df$REEF_NAME[i] &
+                                all_reefs_sf$is_impacted == 1)[1]
+    obs_before_impact <- which(all_reefs_sf$REEF_NAME == reef_df$REEF_NAME[i] &
+                                  all_reefs_sf$YEAR < all_reefs_sf$YEAR[first_impact])
+    all_reefs_sf$reef_state[obs_before_impact] <- paste("Impacted by Unknown")
+  }
+}
 
 # All remaining empty cells in all_reefs_sf$reef_state are "Recovered"
-
+all_reefs_sf$reef_state[which(all_reefs_sf$reef_state == "")] <- "Recovered"
 
 ############################################
 
@@ -299,7 +315,7 @@ leaflet() %>%
                                                     "font-size" = "18px"))) %>%
   saveWidget("gbrmpaMA.html")
 webshot("gbrmpaMA.html", 
-        paste0(out_path, "/DataChapter/Background/BG1.png"),
+        paste0(out_path, "/DataChapter/Background/BG1_uncropped.png"),
         vwidth = 700, vheight = 500, zoom = 8)
 
 ############################################
@@ -456,7 +472,7 @@ bg_4a <- ggplot(data = rebe_reef,
        y = "Cover (%)",
        tag = "A") + 
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
-  scale_y_continuous(limits = c(0,50), 
+  scale_y_continuous(limits = c(0, 50), 
                      breaks = seq(0, 50, 10))
 bg_4b <- ggplot(data = rebe_reef) +
   theme_classic() +
@@ -557,7 +573,67 @@ ggsave(paste0(out_path, "/DataChapter/Background/BG5.png"),
 
 ############ DATA CHAPTER VIS 1 ############
 # How often reefs are in each state (new)
+reef_states <- unique(all_reefs_sf$reef_state)
+unique_mgmts <- unique(all_reefs_sf$AREA_DESCR)
 
+dc_1_vals1 <- table(all_reefs_sf$reef_state[all_reefs_sf$AREA_DESCR == unique_mgmts[1]])
+dc_1_vals2 <- table(all_reefs_sf$reef_state[all_reefs_sf$AREA_DESCR == unique_mgmts[2]])
+dc_1_vals3 <- table(all_reefs_sf$reef_state[all_reefs_sf$AREA_DESCR == unique_mgmts[3]])
+dc_1_vals4 <- table(all_reefs_sf$reef_state[all_reefs_sf$AREA_DESCR == unique_mgmts[4]])
+
+unique_mgmts <- gsub(" Management Area", "",
+                      unique_mgmts)
+dc_1_df <- data.frame(
+  states = factor(rep(reef_states, 4), levels = reef_states),
+  vals = c(dc_1_vals1["Recovered"], dc_1_vals1["Impacted by Compound"], dc_1_vals1["Impacted by Single"], 
+           dc_1_vals2["Recovered"], dc_1_vals2["Impacted by Compound"], dc_1_vals2["Impacted by Single"],
+           dc_1_vals3["Recovered"], dc_1_vals3["Impacted by Compound"], dc_1_vals3["Impacted by Single"],
+           dc_1_vals4["Recovered"], dc_1_vals4["Impacted by Compound"], dc_1_vals4["Impacted by Single"]),
+  col = rep(c("green", "steelblue4", "steelblue1"), 4),
+  fct = c(rep(unique_mgmts[1], 3), rep(unique_mgmts[2], 3), 
+          rep(unique_mgmts[3], 3), rep(unique_mgmts[4], 3))
+)
+
+# Set the order of the levels of the fct variable
+dc_1_df$fct <- factor(dc_1_df$fct, levels = unique_mgmts)
+
+dc_1_plot <- dc_1_df %>%
+  ggplot(aes(fill = states, values = vals)) +
+  expand_limits(x = c(0, 0), y = c(0, 0)) +
+  coord_equal() +
+  labs(fill = NULL, colour = NULL) +
+  theme_ipsum_rc(grid = "") +
+  theme_enhance_waffle() +
+  scale_fill_manual(name = "Reef State",
+                    values = c("#28b028", "steelblue4", "steelblue1"),
+                    breaks = c("Recovered", "Impacted by Compound", "Impacted by Single"),
+                    labels = c("Recovered", "Impacted by Compound Disturbance", "Impacted by Single Disturbance"))
+
+dc_1_plot +
+  geom_waffle(
+    color = "white",
+    size = 0.33,
+    make_proportional = TRUE,
+    n_rows = 10,
+    flip = TRUE
+  ) +
+  facet_wrap(~factor(fct, levels = c("Far Northern",
+                                     "Cairns/Cooktown",
+                                     "Townsville/Whitsunday",
+                                     "Mackay/Capricorn")),
+             nrow = 1) +
+  theme(legend.position = "bottom",
+        legend.title = element_text(size = 14),
+        legend.box = "horizontal",
+        legend.text = element_text(size = 12)) +
+  theme(strip.text.x = element_text(size = 14,
+                          hjust = 0.5)) +
+  guides(fill = guide_legend(title.position = "top",
+                             title.hjust = 0.5))
+
+# Save
+ggsave(paste0(out_path, "/DataChapter/Results/DC_1.png"),
+       plot = last_plot(), width = 10, height = 4)
 
 ############################################
 
@@ -565,8 +641,8 @@ ggsave(paste0(out_path, "/DataChapter/Background/BG5.png"),
 # Two-panel spatial map of number of disturbances at each reef (update)
 side_size <- 0.5
 allreefs_xy <- st_coordinates(all_reefs_sf)
-all_reefs_sf$X <- allreefs_xy[,1]
-all_reefs_sf$Y <- allreefs_xy[,2]
+all_reefs_sf$X <- allreefs_xy[, 1]
+all_reefs_sf$Y <- allreefs_xy[, 2]
 dc_2a <- ggplot() +
   theme_classic() +
   geom_sf(data = map_data,
@@ -628,7 +704,67 @@ ggsave(paste0(out_path, "/DataChapter/Results/DC_2.png"),
 
 ############ DATA CHAPTER VIS 3 ############
 # Three-panel histogram of number of each type of dist at reefs (new)
+reef_df$num_total <- as.numeric(reef_df$num_total)
+reef_df$num_single <- as.numeric(reef_df$num_single)
+reef_df$num_comp <- as.numeric(reef_df$num_comp)
 
+dc_3a <- ggplot() +
+  theme_classic() +
+  geom_histogram(data = reef_df,
+                 mapping = aes(x = num_total),
+                 binwidth = 1,
+                 fill = "grey",
+                 color = "white",
+                 alpha = 0.75) +
+  labs(x = "Number of Disturbances",
+       y = "Number of Reefs",
+       tag = "A") +
+  scale_x_continuous(breaks = seq(0, 20, 2))
+
+dc_3b <- ggplot() +
+  theme_classic() +
+  geom_histogram(data = reef_df,
+                 mapping = aes(x = num_single),
+                 binwidth = 1,
+                 fill = "steelblue1",
+                 color = "white",
+                 alpha = 0.75) +
+  labs(x = "Number of Single Disturbances",
+       y = "Number of Reefs",
+       tag = "B") +
+  scale_x_continuous(breaks = seq(0, max(reef_df[, c("num_single", "num_comp")]), 1))
+
+dc_3c <- ggplot() +
+  theme_classic() +
+  geom_histogram(data = reef_df,
+                 mapping = aes(x = num_comp),
+                 binwidth = 1,
+                 fill = "steelblue4",
+                 color = "white",
+                 alpha = 0.75) +
+  labs(x = "Number of Cumulative Disturbances",
+       y = "Number of Reefs",
+       tag = "C") +
+  scale_x_continuous(breaks = seq(0, max(reef_df[, c("num_single", "num_comp")]), 1))
+
+# Get max count from plot
+p <- ggplot_build(dc_3b)$data[[1]]
+q <- ggplot_build(dc_3c)$data[[1]]
+
+dc_3b <- dc_3b +
+  scale_y_continuous(limits = c(0, max(p$count, q$count)))
+dc_3c <- dc_3c +
+  scale_y_continuous(limits = c(0, max(p$count, q$count)))
+
+# Combine the plots
+dc_3bc <- ggarrange(dc_3a, dc_3b, dc_3c,
+          ncol = 3, nrow = 1,
+          common.legend = FALSE
+)
+
+# Save
+ggsave(paste0(out_path, "/DataChapter/Results/DC_3.png"),
+       plot = last_plot(), width = 10, height = 4)
 
 ############################################
 

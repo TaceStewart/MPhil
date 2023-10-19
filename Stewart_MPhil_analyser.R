@@ -25,6 +25,7 @@ analyse_reefs <- function(
         latitude = double(),
         longitude = double(),
         sector = character(),
+        num_total = integer(),
         num_single = integer(),
         prob_s_dist = double(),
         prob_s_impact = double(),
@@ -33,7 +34,8 @@ analyse_reefs <- function(
         prob_c_dist = double(),
         prob_c_impact = double(),
         prob_c_recov = double(),
-        reef_unknown = integer()
+        reef_unknown = integer(),
+        baseline_inferred = character()
     )
     
     # Initialise overall unknown count
@@ -45,7 +47,7 @@ analyse_reefs <- function(
         obs_by_reef <- all_reefs_sf[all_reefs_sf$REEF_NAME == reef_name, ]
         # Separate single and compound disturbances and get recovery times
         if (is_time_based) {
-            obs_by_reef <- single_or_compound(
+            result_vec <- single_or_compound(
                 obs_by_reef = obs_by_reef,
                 is_time_based = is_time_based,
                 recov_yrs = recov_yrs,
@@ -56,8 +58,11 @@ analyse_reefs <- function(
                 epsilon = epsilon,
                 baseline_str = baseline_str
             )
+
+            obs_by_reef <- result_vec[[1]]
+            baseline_inferred <- result_vec[[2]]
         } else {
-            obs_by_reef <- single_or_compound(
+            result_vec <- single_or_compound(
                 obs_by_reef = obs_by_reef,
                 is_time_based = is_time_based,
                 recov_th = recov_th,
@@ -68,6 +73,9 @@ analyse_reefs <- function(
                 epsilon = epsilon,
                 baseline_str = baseline_str
             )
+
+            obs_by_reef <- result_vec[[1]]
+            baseline_inferred <- result_vec[[2]]
         }
         # Calculate number of years observed inclusive
         yrs_obsvd <- obs_by_reef$YEAR[nrow(obs_by_reef)] - obs_by_reef$YEAR[1] + 1
@@ -179,6 +187,9 @@ analyse_reefs <- function(
         coordinates <- st_coordinates(obs_by_reef$geometry)
         latitude <- coordinates[1, 2]
         longitude <- coordinates[1, 1]
+
+        ## Get number of total disturbances
+        num_total <- sum(obs_by_reef$is_disturbed, na.rm = TRUE)
         
         ## Add all relevant information to data frame
         new_row <- c(
@@ -186,6 +197,7 @@ analyse_reefs <- function(
             latitude, # latitude of reef/site
             longitude, # longitude of reef/site
             obs_by_reef$AREA_DESCR[1], # management region
+            num_total, # total number of disturbances in obs period
             num_single, # no. of singular dists in obs period
             prob_s_dist, # probability of single disturbance per year
             prob_s_impact, # probability of impact given single disturbance
@@ -194,7 +206,8 @@ analyse_reefs <- function(
             prob_c_dist, # probability of compound disturbance per year
             prob_c_impact, # probability of impact given compound disturbance
             prob_c_recov, # recovery rate following compound dist impact
-            reef_unknown
+            reef_unknown, # number of unknown recovery times
+            baseline_inferred # if baseline inferred
         ) # number of unknown recovery times
         reef_df[nrow(reef_df) + 1, ] <- new_row
         # Replace all_reefs_sf with new info

@@ -10,13 +10,12 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
                                baseline_str = "mean") {
   # Create vector of disturbance string names
   dist_names <- c("CoTS Outbreak", "Wind Stress", "Heat Stress")
+  baseline_inferred <- NA
   
   # If there are no disturbances
   if (max(obs_by_reef$COTS_value) < cots_dist &&
       max(obs_by_reef$Hs4MW_value) < cyc_dist &&
       max(obs_by_reef$DHW_value) < dhw_dist) {
-    
-    obs_by_reef$reef_state <- "Not disturbed"
   } else { # If there are disturbances
     # Get indices of disturbance years
     dist_indices <- which(obs_by_reef$is_disturbed)
@@ -66,6 +65,7 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
           obs_by_reef$COVER[dist_indices[1]] < max_pre_dist_cover * (1 - epsilon)) {
         # Then we have a reef with a baseline
         baseline <- max_pre_dist_cover * (1 - epsilon)
+        baseline_inferred <- FALSE
       } else if (infer_baseline) {
         # Find local maxima within the epsilon range
         local_maxima <- findpeaks(obs_by_reef$COVER, nups = 1, ndowns = 1)
@@ -90,9 +90,12 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
                              max(obs_by_reef$COVER)
           )
         }
+
+        baseline_inferred <- TRUE
       } else {
         # Then this reef does not have a baseline
         baseline <- NA
+        baseline_inferred <- FALSE
       }
       # Initialise skip variable
       skip_next <- 0
@@ -303,5 +306,5 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
   }
   
   # Return recovery and disturbance probabilities
-  return(obs_by_reef)
+  return(list(obs_by_reef, baseline_inferred)) 
 }
