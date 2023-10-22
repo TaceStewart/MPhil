@@ -35,7 +35,8 @@ analyse_reefs <- function(
         prob_c_impact = double(),
         prob_c_recov = double(),
         reef_unknown = integer(),
-        baseline_inferred = character()
+        baseline_inferred = character(),
+        baseline_vals = character()
     )
     
     # Initialise overall unknown count
@@ -60,7 +61,6 @@ analyse_reefs <- function(
             )
 
             obs_by_reef <- result_vec[[1]]
-            baseline_inferred <- result_vec[[2]]
         } else {
             result_vec <- single_or_compound(
                 obs_by_reef = obs_by_reef,
@@ -76,6 +76,7 @@ analyse_reefs <- function(
 
             obs_by_reef <- result_vec[[1]]
             baseline_inferred <- result_vec[[2]]
+            baseline_vals <- result_vec[[3]]
         }
         # Calculate number of years observed inclusive
         yrs_obsvd <- obs_by_reef$YEAR[nrow(obs_by_reef)] - obs_by_reef$YEAR[1] + 1
@@ -190,6 +191,9 @@ analyse_reefs <- function(
 
         ## Get number of total disturbances
         num_total <- sum(obs_by_reef$is_disturbed, na.rm = TRUE)
+
+        ## Convert baseline_vals to string
+        baseline_vals <- paste(baseline_vals, collapse = ", ")
         
         ## Add all relevant information to data frame
         new_row <- c(
@@ -207,7 +211,8 @@ analyse_reefs <- function(
             prob_c_impact, # probability of impact given compound disturbance
             prob_c_recov, # recovery rate following compound dist impact
             reef_unknown, # number of unknown recovery times
-            baseline_inferred # if baseline inferred
+            baseline_inferred, # if baseline inferred
+            baseline_vals # baselines used in reef
         ) # number of unknown recovery times
         reef_df[nrow(reef_df) + 1, ] <- new_row
         # Replace all_reefs_sf with new info
