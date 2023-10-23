@@ -37,6 +37,7 @@ library(htmlwidgets)
 library(htmltools)
 library(webshot)
 library(hrbrthemes)
+library(facefuns)
 
 # Load disturbance and recovery calculators
 source("Stewart_MPhil_single_or_compound.R")
@@ -626,15 +627,16 @@ ggsave(paste0(out_path, "/DataChapter/Background/BG6unedited.png"),
 
 ############ DATA CHAPTER VIS 1 ############
 # Distribution of initial baseline values by management area (new)
-all_beta_minus_eps <- reef_df$baseline_vals %>%
+reef_df$init_beta_minus_eps <- reef_df$baseline_vals %>%
   strsplit(", ") %>%
   lapply(first) %>%
   unlist() %>%
   as.numeric()
-all_beta_minus_eps <- all_beta_minus_eps[!is.na(all_beta_minus_eps)]
+reef_df$baseline_vals <- reef_df$init_beta_minus_eps / (1 - epsilon)
+all_beta_minus_eps <- reef_df$init_beta_minus_eps[!is.na(reef_df$init_beta_minus_eps)]
 all_baselines <- all_beta_minus_eps / (1 - epsilon)
 
-ggplot(data = data.frame(all_baselines = all_baselines), 
+dc_1a <- ggplot(data = data.frame(all_baselines = all_baselines), 
        aes(x = all_baselines)) +
   geom_histogram(aes(y = after_stat(density)),
                  color = "grey30", 
@@ -649,16 +651,65 @@ ggplot(data = data.frame(all_baselines = all_baselines),
              linetype = "dashed", 
              linewidth = 1,
              color = "#FC4E07") +
-  labs(x = "Baseline Values", 
-       y = "Density") +
+  labs(x = "Initial Baseline Coral Cover (%)", 
+       y = "Density",
+       tag = "A") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
         axis.text = element_text(size = 10),
         legend.position = "None")
 
+# calculate mean and 95% CI for each management area
+dc_1b_means <- reef_df %>%
+  group_by(sector) %>%
+  summarise(mean = mean(init_beta_minus_eps, na.rm = TRUE),
+            lower = quantile(init_beta_minus_eps, 0.025, na.rm = TRUE),
+            upper = quantile(init_beta_minus_eps, 0.975, na.rm = TRUE))
+
+# Distribution of initial baseline values by management area
+dc_1b <- ggplot(data = reef_df,
+                aes(x = baseline_vals)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 color = "grey30", 
+                 fill = "white",
+                 alpha = 0.75,
+                 linewidth = 0.75) +
+  geom_density(aes(y = after_stat(density)),
+                color = "black",
+                alpha = 0.75,
+                linewidth = 1) +
+  geom_vline(data = dc_1b_means,
+             aes(xintercept = mean),
+              linetype = "dashed", 
+              linewidth = 1,
+              color = "#FC4E07") +
+  labs(x = "Initial Baseline Coral Cover (%)",
+        y = "Density",
+        tag = "B") +
+  theme_classic() +
+  theme(axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        legend.position = "None") +
+  facet_wrap(~factor(sector, 
+                     levels = c("Far Northern Management Area",
+                                "Cairns/Cooktown Management Area",
+                                "Townsville/Whitsunday Management Area",
+                                "Mackay/Capricorn Management Area"),
+                     labels = c("Far Northern",
+                                "Cairns/Cooktown",
+                                "Townsville/Whitsunday",
+                                "Mackay/Capricorn")), 
+                     ncol = 1)
+
+# Combine the plots
+ggarrange(dc_1a, dc_1b,
+          ncol = 2, nrow = 1,
+          common.legend = FALSE
+)
+
 # Save
 ggsave(paste0(out_path, "/DataChapter/Results/DC_1.png"),
-       plot = last_plot(), width = 5, height = 4)
+       plot = last_plot(), width = 8, height = 5)
 ############################################
 
 ############ DATA CHAPTER VIS 2 ############
@@ -728,7 +779,7 @@ dc_2b <- dc_2b +
                        high = "steelblue4")
 
 # Plot of distribution of number of disturbances, split by management area
-#devtools::install_github("psyteachr/introdataviz")
+#devtools::install_github("iholzleitner/facefuns")
 dc_2c_df <- reef_df %>%
   select(reef_name, sector, num_single, num_comp) %>%
   pivot_longer(cols = c("num_single", "num_comp"),
@@ -752,12 +803,12 @@ dc_2c <- ggplot(data = dc_2c_df,
   labs(x = "Management Area",
        y = "Number of Disturbances",
        tag = "C") +
-  theme(legend.position = c(1, 1),
+  theme(legend.background = element_blank(),
+        legend.position = c(1, 1),
         legend.justification = c(1, 1),
-        legend.background = element_blank(),
-        legend.title = element_text(size = 12),
+        legend.title = element_text(size = 10),
         legend.box = "horizontal",
-        legend.text = element_text(size = 12),
+        legend.text = element_text(size = 8),
         axis.title = element_text(size = 12),
         axis.text = element_text(size = 10)) +
   scale_y_continuous(breaks = seq(0, max(reef_df[, c("num_single", "num_comp")]), 1),
@@ -768,17 +819,20 @@ dc_2c <- ggplot(data = dc_2c_df,
 
 # Combine the plots
 dc_2ab <- ggarrange(dc_2a, dc_2b,
-          ncol = 1, nrow = 2,
+          ncol = 2, nrow = 1,
           common.legend = TRUE,
-          legend = "left"
+          legend = "bottom",
+          widths = c(1, 1)
 )
 dc_2 <- ggarrange(dc_2ab, dc_2c,
-          ncol = 2, nrow = 1,
-          common.legend = FALSE
+      ncol = 2, nrow = 1,
+      common.legend = FALSE,
+      widths = c(0.5, 0.5),
+      align = "h"
 )
 # Save
 ggsave(paste0(out_path, "/DataChapter/Results/DC_2.png"),
-       plot = last_plot(), width = 9, height = 8)
+       plot = last_plot(), width = 12, height = 7)
 ############################################
 
 ############ DATA CHAPTER VIS 3 ############
@@ -856,7 +910,7 @@ dc_4a_df <- reef_df %>%
                values_to = "pr_dist")
 
 dc_4a <- ggplot(data = dc_4a_df,
-                aes(y = pr_dist,
+                aes(y = pr_dist * 100,
                     x = factor(sector, 
                     levels = c("Mackay/Capricorn Management Area",
                              "Townsville/Whitsunday Management Area",
@@ -880,9 +934,10 @@ dc_4a <- ggplot(data = dc_4a_df,
         legend.text = element_text(size = 12),
         axis.title = element_text(size = 12),
         axis.text = element_text(size = 10)) +
-  scale_y_continuous(breaks = seq(0, 1, 0.1),
-                      limits = c(0, 1)) +
-  scale_fill_manual(values = c("steelblue1", "steelblue4"),
+  scale_y_continuous(breaks = seq(0, 100, 20),
+                      limits = c(0, 100)) +
+  scale_fill_manual(values = c("prob_s_dist" = "steelblue1", 
+                               "prob_c_dist" = "steelblue4"),
                     name = "Disturbance Type",
                     labels = c("Single", "Cumulative"))
 
@@ -890,10 +945,10 @@ dc_4b_df <- reef_df %>%
   select(reef_name, sector, prob_s_impact, prob_c_impact) %>%
   pivot_longer(cols = c("prob_s_impact", "prob_c_impact"),
                names_to = "dist_type",
-               values_to = "prob_c_impact")
+               values_to = "prob_impact")
 
 dc_4b <- ggplot(data = dc_4b_df,
-                aes(y = prob_c_impact,
+                aes(y = prob_impact * 100,
                     x = factor(sector, 
                     levels = c("Mackay/Capricorn Management Area",
                              "Townsville/Whitsunday Management Area",
@@ -915,11 +970,14 @@ dc_4b <- ggplot(data = dc_4b_df,
         legend.title = element_text(size = 12),
         legend.box = "horizontal",
         legend.text = element_text(size = 12),
-        axis.title = element_text(size = 12),
-        axis.text = element_text(size = 10)) +
-  scale_y_continuous(breaks = seq(0, 1, 0.1),
-                      limits = c(0, 1)) +
-  scale_fill_manual(values = c("steelblue1", "steelblue4"),
+        axis.title.x = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(breaks = seq(0, 100, 20),
+                      limits = c(0, 100)) +
+  scale_fill_manual(values = c("prob_s_impact" = "steelblue1", 
+                               "prob_c_impact" = "steelblue4"),
                     name = "Disturbance Type",
                     labels = c("Single", "Cumulative"))
 
@@ -952,11 +1010,14 @@ dc_4c <- ggplot(data = dc_4c_df,
         legend.title = element_text(size = 12),
         legend.box = "horizontal",
         legend.text = element_text(size = 12),
-        axis.title = element_text(size = 12),
-        axis.text = element_text(size = 10)) +
-  scale_y_continuous(breaks = seq(0, 1, 0.1),
+        axis.title.x = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(breaks = seq(0, 1, 0.2),
                       limits = c(0, 1)) +
-  scale_fill_manual(values = c("steelblue1", "steelblue4"),
+  scale_fill_manual(values = c("prob_s_recov" = "steelblue1", 
+                               "prob_c_recov" = "steelblue4"),
                     name = "Disturbance Type",
                     labels = c("Single", "Cumulative"))
 

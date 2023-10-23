@@ -260,7 +260,7 @@ dc_sens_1 <- ggarrange(dc_sens_1a, dc_sens_1b,
 
 # Save the plot
 ggsave(
-  paste0(out_path, "/Sens1.png"),
+  paste0(out_path, "/Sens_1.png"),
   width = 9, height = 6
 )
 ############################################
@@ -349,7 +349,7 @@ ggplot(data = reef_df_all,
 
 # Save the plot
 ggsave(
-  paste0(out_path, "/Sens2.png"),
+  paste0(out_path, "/Sens_2.png"),
   width = 6, height = 5
 )
 ############################################
@@ -531,7 +531,7 @@ dc_sens_3 <- ggarrange(dc_sens_3a, dc_sens_3b, ncol = 1, nrow = 2, heights = c(0
 
 # Save the plot
 ggsave(
-  paste0(out_path, "/Sens3.png"),
+  paste0(out_path, "/Sens_3.png"),
   width = 6, height = 8
 )
 ############################################
@@ -623,7 +623,7 @@ dc_sens_4 <- ggplot(data = dc_sens_4_df,
 
 # Save the plot
 ggsave(
-  paste0(out_path, "/Sens4.png"),
+  paste0(out_path, "/Sens_4.png"),
   width = 6, height = 5
 )
 
