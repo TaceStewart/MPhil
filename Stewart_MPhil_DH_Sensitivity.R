@@ -333,10 +333,10 @@ ggplot(data = reef_df_all,
              data = mu,
              linetype = "dashed", 
              linewidth = 1) +
-  labs(x = "Baseline Values", 
+  labs(x = "Initial Baseline Coral Cover (%)", 
        y = "Density",
-       fill = "Baseline Estimate",
-       color = "Baseline Estimate") +
+       fill = "Baseline Estimation Method",
+       color = "Baseline Estimation Method") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
         axis.text = element_text(size = 10),
@@ -350,7 +350,7 @@ ggplot(data = reef_df_all,
 # Save the plot
 ggsave(
   paste0(out_path, "/Sens_2.png"),
-  width = 6, height = 5
+  width = 8, height = 5
 )
 ############################################
 
@@ -458,14 +458,15 @@ dc_sens_3a <- ggplot(data = dc_sens_3_df[dc_sens_3_df$dist_type != "num_total", 
        hjust = 0.5,
        vjust = 0) +
   labs(x = "Epsilon Value", 
-    y = "Number of Disturbances",
+    y = "Average Number of Disturbances",
     color = "Disturbance Type",
     tag = "A") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
      axis.text = element_text(size = 10),
      legend.title = element_text(size = 12),
-     legend.text = element_text(size = 10)) +
+     legend.text = element_text(size = 10),
+     legend.position = "bottom") +
   scale_color_manual(values = c("num_total_cat" = "grey15", "num_single" = "steelblue1", "num_comp" = "steelblue4"),
         labels = c("num_total_cat" = "Total Categorised", "num_single" = "Single", "num_comp" = "Cumulative"))
 
@@ -521,18 +522,21 @@ dc_sens_3b <- ggplot() +
   theme(axis.title = element_text(size = 12),
      axis.text = element_text(size = 10),
      legend.title = element_text(size = 12),
-     legend.text = element_text(size = 10)) +
+     legend.text = element_text(size = 10),
+     legend.position = "bottom") +
   scale_color_manual(values = c("num_single" = "steelblue1", "num_comp" = "steelblue4"),
         labels = c("num_single" = "Single", "num_comp" = "Cumulative"))
 
 # Combine the plots
-dc_sens_3 <- ggarrange(dc_sens_3a, dc_sens_3b, ncol = 1, nrow = 2, heights = c(0.6, 0.4))
+dc_sens_3 <- ggarrange(dc_sens_3a, dc_sens_3b, 
+                       ncol = 2, nrow = 1, 
+                       widths = c(1, 1))
 
 
 # Save the plot
 ggsave(
   paste0(out_path, "/Sens_3.png"),
-  width = 6, height = 8
+  width = 10, height = 5
 )
 ############################################
 
@@ -610,7 +614,7 @@ dc_sens_4 <- ggplot(data = dc_sens_4_df,
                 width = 0.01) +
   geom_smooth(method = "loess",
               se = TRUE) +
-  labs(x = TeX("Recovery Threshold (Baseline \\times (1 - $\\rho$))"),
+  labs(x = TeX("Recovery Threshold (1 - $\\rho$)"),
         y = "Probability of Recovery",
         color = "Disturbance Type") +
   theme_classic() +
