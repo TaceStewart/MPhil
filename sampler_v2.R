@@ -3,8 +3,6 @@
 samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
                       is_time_based, recov_th, recov_yrs, cots_dist, cyc_dist,
                       dhw_dist) {
-  LO <- 0
-  UP <- 1
   # Define the number of reefs per management area
   unique_mgmts <- unique(reef_df$sector)
   reefs_per_mgmt <- floor(num_samples / length(unique_mgmts))
@@ -73,13 +71,17 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
       }
       reef_indx <- which(reef_df$sector %in% sector_boundaries$AREA_DESCR[mgmt_index])
     }
-    mgmt_impacts <- rnorm(n = reefs_per_mgmt,
+    mgmt_prob <- rnorm(n = reefs_per_mgmt,
                           mean = mean(reef_df$prob_s_impact[reef_indx],
                                       na.rm = TRUE),
                           sd = sd(reef_df$prob_s_impact[reef_indx],
                                   na.rm = TRUE))
-    mgmt_impacts <- (mgmt_impacts - min(mgmt_impacts)) / (max(mgmt_impacts) - min(mgmt_impacts)) * (UP - LO) + LO
-    sample_reefs_df$prob_s_impact[sample_mgmt_indx] <- mgmt_impacts
+    if (!is.na(mgmt_prob) && mgmt_prob < 0) {
+      mgmt_prob <- 0
+    } else if (!is.na(mgmt_prob) && mgmt_prob > 1) {
+      mgmt_prob <- 1
+    }
+    sample_reefs_df$prob_s_impact[sample_mgmt_indx] <- mgmt_prob
     
     # Sample the probability of impact from compound disturbance for the management area
     mgmt_index <- which(sector_boundaries$AREA_DESCR == unique_mgmts[row])
@@ -96,13 +98,17 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
       }
       reef_indx <- which(reef_df$sector %in% sector_boundaries$AREA_DESCR[mgmt_index])
     }
-    mgmt_impacts <- rnorm(n = reefs_per_mgmt,
+    mgmt_prob <- rnorm(n = reefs_per_mgmt,
                           mean = mean(reef_df$prob_c_impact[reef_indx],
                                       na.rm = TRUE),
                           sd = sd(reef_df$prob_c_impact[reef_indx],
                                   na.rm = TRUE))
-    mgmt_impacts <- (mgmt_impacts - min(mgmt_impacts)) / (max(mgmt_impacts) - min(mgmt_impacts)) * (UP - LO) + LO
-    sample_reefs_df$prob_c_impact[sample_mgmt_indx] <- mgmt_impacts
+    if (!is.na(mgmt_prob) && mgmt_prob < 0) {
+      mgmt_prob <- 0
+    } else if (!is.na(mgmt_prob) && mgmt_prob > 1) {
+      mgmt_prob <- 1
+    }
+    sample_reefs_df$prob_c_impact[sample_mgmt_indx] <- mgmt_prob
     
     # Sample the probability of recovery from single disturbance for the management area
     mgmt_index <- which(sector_boundaries$AREA_DESCR == unique_mgmts[row])
@@ -119,13 +125,17 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
       }
       reef_indx <- which(reef_df$sector %in% sector_boundaries$AREA_DESCR[mgmt_index])
     }
-    mgmt_impacts <- rnorm(n = reefs_per_mgmt,
+    mgmt_prob <- rnorm(n = reefs_per_mgmt,
                           mean = mean(reef_df$prob_s_recov[reef_indx],
                                       na.rm = TRUE),
                           sd = sd(reef_df$prob_s_recov[reef_indx],
                                   na.rm = TRUE))
-    mgmt_impacts <- (mgmt_impacts - min(mgmt_impacts)) / (max(mgmt_impacts) - min(mgmt_impacts)) * (UP - LO) + LO
-    sample_reefs_df$prob_s_recov[sample_mgmt_indx] <- mgmt_impacts
+    if (!is.na(mgmt_prob) && mgmt_prob < 0) {
+      mgmt_prob <- 0
+    } else if (!is.na(mgmt_prob) && mgmt_prob > 1) {
+      mgmt_prob <- 1
+    }
+    sample_reefs_df$prob_s_recov[sample_mgmt_indx] <- mgmt_prob
     
     # Sample the probability of recovery from compound disturbance for the management area
     mgmt_index <- which(sector_boundaries$AREA_DESCR == unique_mgmts[row])
@@ -142,14 +152,17 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
       }
       reef_indx <- which(reef_df$sector %in% sector_boundaries$AREA_DESCR[mgmt_index])
     }
-    
-    mgmt_impacts <- rnorm(n = reefs_per_mgmt,
+    mgmt_prob <- rnorm(n = reefs_per_mgmt,
                           mean = mean(reef_df$prob_c_recov[reef_indx],
                                       na.rm = TRUE),
                           sd = sd(reef_df$prob_c_recov[reef_indx],
                                   na.rm = TRUE))
-    mgmt_impacts <- (mgmt_impacts - min(mgmt_impacts)) / (max(mgmt_impacts) - min(mgmt_impacts)) * (UP - LO) + LO
-    sample_reefs_df$prob_c_recov[sample_mgmt_indx] <- mgmt_impacts
+    if (!is.na(mgmt_prob) && mgmt_prob < 0) {
+      mgmt_prob <- 0
+    } else if (!is.na(mgmt_prob) && mgmt_prob > 1) {
+      mgmt_prob <- 1
+    }
+    sample_reefs_df$prob_c_recov[sample_mgmt_indx] <- mgmt_prob
   }
   
   # For each unique sample reef

@@ -96,12 +96,19 @@ analyse_reefs <- function(
                                         na.rm = TRUE
                                     )
         )
+        if (!is.na(prob_s_impact) && prob_s_impact < 0) {
+            prob_s_impact <- 0
+        } else if (!is.na(prob_s_impact) && prob_s_impact > 1) {
+            prob_s_impact <- 1
+        }
         prob_s_recov <- ifelse(any(!is.na(single_dist$r_given_impact)) && 
-                                       !is.na(sd(single_dist$r_given_impact[!is.na(single_dist$r_given_impact)], 
+                                       !is.na(sd(single_dist$r_given_impact, 
                                                  na.rm = TRUE)),
                                rnorm(1, 
-                                     mean(single_dist$r_given_impact[!is.na(single_dist$r_given_impact)], na.rm = TRUE), 
-                                     sd(single_dist$r_given_impact[!is.na(single_dist$r_given_impact)], na.rm = TRUE)
+                                     mean(single_dist$r_given_impact, 
+                                          na.rm = TRUE), 
+                                     sd(single_dist$r_given_impact, 
+                                        na.rm = TRUE)
                                ),
                                NA
         )
@@ -123,6 +130,11 @@ analyse_reefs <- function(
                                         na.rm = TRUE
                                     )
         )
+        if (!is.na(prob_c_impact) && prob_c_impact < 0) {
+            prob_c_impact <- 0
+        } else if (!is.na(prob_c_impact) && prob_c_impact > 1) {
+            prob_c_impact <- 1
+        }
         prob_c_recov <- ifelse(any(!is.na(comp_dist$r_given_impact)) && 
                                        !is.na(sd(comp_dist$r_given_impact[!is.na(comp_dist$r_given_impact)], 
                                                  na.rm = TRUE)),
