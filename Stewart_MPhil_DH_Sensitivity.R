@@ -73,7 +73,7 @@ shapefile_path <- paste0(
   "Barrier_Reef_Marine_Park.shp"
 )
 sector_boundaries <- st_read(shapefile_path,
-  quiet = TRUE
+                             quiet = TRUE
 )
 
 ############## SET VARIABLES ###############
@@ -125,8 +125,8 @@ overall_unknown_count <- 0
 all_reefs_sf <- all_reefs_sf %>%
   mutate(
     is_disturbed = (all_reefs_sf$COTS_value >= cots_dist |
-      all_reefs_sf$Hs4MW_value >= cyc_dist |
-      all_reefs_sf$DHW_value >= dhw_dist),
+                      all_reefs_sf$Hs4MW_value >= cyc_dist |
+                      all_reefs_sf$DHW_value >= dhw_dist),
     is_impacted = 0,
     single_or_compound = NA,
     dist_type = NA,
@@ -154,13 +154,13 @@ for (infer_baseline in baseline_infer_bool) {
     cyc_dist, dhw_dist, infer_baseline, epsilon,
     baseline_str
   )
-
+  
   # Extract the list elements
   event_counts <- sing_comp_list[[1]]
   all_reefs_sf <- sing_comp_list[[2]]
   reef_df <- sing_comp_list[[3]] %>%
     mutate(baseline_infer_bool = infer_baseline)
-
+  
   reef_df_all[(nrow(reef_df_all) + 1):(nrow(reef_df_all) + nrow(reef_df)), 1:ncol(reef_df)] <- reef_df
   i <- i + 1
 }
@@ -182,16 +182,16 @@ mu <- reef_df_all %>%
 
 # Part A: Overall
 dc_sens_1a <- ggplot(data = reef_df_all, 
-       aes(x = initial_bl)) +
+                     aes(x = initial_bl)) +
   geom_density(aes(y = after_stat(density) * 100,
-               fill = factor(baseline_infer_bool,
-                             levels = c(1, 0))),
+                   fill = factor(baseline_infer_bool,
+                                 levels = c(1, 0))),
                alpha = 0.4,
                color = "black",
                linewidth = 1) +
   geom_vline(aes(xintercept = grp.mean,
-             color = factor(baseline_infer_bool,
-                             levels = c(1, 0))), 
+                 color = factor(baseline_infer_bool,
+                                levels = c(1, 0))), 
              data = mu,
              linetype = "dashed", 
              linewidth = 1) +
@@ -204,44 +204,50 @@ dc_sens_1a <- ggplot(data = reef_df_all,
   theme(axis.title = element_text(size = 12),
         axis.text = element_text(size = 10),
         legend.title = element_text(size = 12),
-        legend.text = element_text(size = 10)) +
+        legend.text = element_text(size = 10),
+        panel.grid.major.y = element_line(linetype = "dashed", "lightgrey")) +
+  scale_x_continuous(limits = c(0, 100),
+                     breaks = seq(0, 100, 20)) +
   scale_fill_manual(values = c("0" = "#F8766D", "1" = "#00BFC4"),
                     labels = c("0" = "No", "1" = "Yes")) +
   scale_color_manual(values = c("0" = "#F8766D", "1" = "#00BFC4"),
-                    labels = c("0" = "No", "1" = "Yes"))
+                     labels = c("0" = "No", "1" = "Yes"))
 
 # Part B: By management area
 mu_1b <- reef_df_all %>%
   group_by(baseline_infer_bool, sector) %>% 
   summarise(grp.mean = mean(initial_bl, na.rm = TRUE))
 dc_sens_1b <- ggplot(data = reef_df_all, 
-    aes(x = initial_bl)) +
+                     aes(x = initial_bl)) +
   geom_density(aes(y = after_stat(density) * 100,
-      fill = factor(baseline_infer_bool,
-              levels = c(1, 0))),
-      alpha = 0.4,
-      color = "black",
-      linewidth = 1) +
+                   fill = factor(baseline_infer_bool,
+                                 levels = c(1, 0))),
+               alpha = 0.4,
+               color = "black",
+               linewidth = 1) +
   geom_vline(aes(xintercept = grp.mean,
-       color = factor(baseline_infer_bool,
-              levels = c(1, 0))), 
-       data = mu_1b,
-       linetype = "dashed", 
-       linewidth = 1) +
+                 color = factor(baseline_infer_bool,
+                                levels = c(1, 0))), 
+             data = mu_1b,
+             linetype = "dashed", 
+             linewidth = 1) +
   labs(x = "Initial Baseline Coral Cover (%)", 
-    y = "Proportion of Reefs",
-    fill = "Baseline Inferred?",
-    color = "Baseline Inferred?",
-    tag = "B") +
+       y = "Proportion of Reefs (%)",
+       fill = "Baseline Inferred?",
+       color = "Baseline Inferred?",
+       tag = "B") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
-     axis.text = element_text(size = 10),
-     legend.title = element_text(size = 12),
-     legend.text = element_text(size = 10)) +
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10),
+        panel.grid.major.y = element_line(linetype = "dashed", "lightgrey")) +
+  scale_x_continuous(limits = c(0, 100),
+                     breaks = seq(0, 100, 20)) +
   scale_fill_manual(values = c("0" = "#F8766D", "1" = "#00BFC4"),
-        labels = c("0" = "No", "1" = "Yes")) +
+                    labels = c("0" = "No", "1" = "Yes")) +
   scale_color_manual(values = c("0" = "#F8766D", "1" = "#00BFC4"),
-        labels = c("0" = "No", "1" = "Yes")) +
+                     labels = c("0" = "No", "1" = "Yes")) +
   facet_wrap(~factor(sector, 
                      levels = c("Far Northern Management Area",
                                 "Cairns/Cooktown Management Area",
@@ -251,7 +257,7 @@ dc_sens_1b <- ggplot(data = reef_df_all,
                                 "Cairns/Cooktown",
                                 "Townsville/Whitsunday",
                                 "Mackay/Capricorn")), 
-                     ncol = 1)
+             ncol = 1)
 
 # Combine the plots
 dc_sens_1 <- ggarrange(dc_sens_1a, dc_sens_1b, 
@@ -270,8 +276,8 @@ ggsave(
 all_reefs_sf <- all_reefs_sf %>%
   mutate(
     is_disturbed = (all_reefs_sf$COTS_value >= cots_dist |
-      all_reefs_sf$Hs4MW_value >= cyc_dist |
-      all_reefs_sf$DHW_value >= dhw_dist),
+                      all_reefs_sf$Hs4MW_value >= cyc_dist |
+                      all_reefs_sf$DHW_value >= dhw_dist),
     is_impacted = 0,
     single_or_compound = NA,
     dist_type = NA,
@@ -295,13 +301,13 @@ for (baseline_str in baseline_infer_list) {
     cyc_dist, dhw_dist, infer_baseline, epsilon,
     baseline_str
   )
-
+  
   # Extract the list elements
   event_counts <- sing_comp_list[[1]]
   all_reefs_sf <- sing_comp_list[[2]]
   reef_df <- sing_comp_list[[3]] %>%
     mutate(baseline_str = baseline_str)
-
+  
   reef_df_all[(nrow(reef_df_all) + 1):(nrow(reef_df_all) + nrow(reef_df)), 1:ncol(reef_df)] <- reef_df
   i <- i + 1
 }
@@ -324,28 +330,34 @@ mu <- reef_df_all %>%
 ggplot(data = reef_df_all, 
        aes(x = initial_bl)) +
   geom_density(aes(y = after_stat(density) * 100,
-               fill = as.factor(baseline_str)),
+                   fill = as.factor(baseline_str)),
                alpha = 0.4,
                color = "black",
                linewidth = 1) +
   geom_vline(aes(xintercept = grp.mean,
-             color = as.factor(baseline_str)), 
+                 color = as.factor(baseline_str)), 
              data = mu,
              linetype = "dashed", 
              linewidth = 1) +
   labs(x = "Initial Baseline Coral Cover (%)", 
-       y = "Proportion of Reefs",
-       fill = "Baseline Estimation Method",
-       color = "Baseline Estimation Method") +
+       y = "Proportion of Reefs (%)",
+       fill = "Baseline Estimation\nMethod",
+       color = "Baseline Estimation\nMethod") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
         axis.text = element_text(size = 10),
         legend.title = element_text(size = 12),
-        legend.text = element_text(size = 10)) +
+        legend.text = element_text(size = 10),
+        legend.position = c(0.9, 0.9),
+        legend.justification = c(1, 1),
+        legend.background = element_blank(),
+        panel.grid.major.y = element_line(linetype = "dashed", "lightgrey")) +
+  scale_x_continuous(limits = c(0, 100),
+                     breaks = seq(0, 100, 20)) +
   scale_fill_manual(values = c("min" = "#F8766D", "mean" = "#00BFC4", "max" = "#619CFF"),
                     labels = c("min" = "Minimum", "mean" = "Mean", "max" = "Maximum")) +
   scale_color_manual(values = c("min" = "#F8766D", "mean" = "#00BFC4", "max" = "#619CFF"),
-                    labels = c("min" = "Minimum", "mean" = "Mean", "max" = "Maximum"))
+                     labels = c("min" = "Minimum", "mean" = "Mean", "max" = "Maximum"))
 
 # Save the plot
 ggsave(
@@ -364,18 +376,18 @@ reef_df_all <- data.frame(matrix(NA, nrow = 0, ncol = 17))
 i <- 1
 for (epsilon in list_epsilon) {
   all_reefs_sf <- all_reefs_sf %>%
-  mutate(
-    is_disturbed = (all_reefs_sf$COTS_value >= cots_dist |
-      all_reefs_sf$Hs4MW_value >= cyc_dist |
-      all_reefs_sf$DHW_value >= dhw_dist),
-    is_impacted = 0,
-    single_or_compound = NA,
-    dist_type = NA,
-    recov_year = NA,
-    recov_time = NA,
-    r_given_impact = NA
-  )
-
+    mutate(
+      is_disturbed = (all_reefs_sf$COTS_value >= cots_dist |
+                        all_reefs_sf$Hs4MW_value >= cyc_dist |
+                        all_reefs_sf$DHW_value >= dhw_dist),
+      is_impacted = 0,
+      single_or_compound = NA,
+      dist_type = NA,
+      recov_year = NA,
+      recov_time = NA,
+      r_given_impact = NA
+    )
+  
   # SINGLE OR COMPOUND DIST
   # Analyse reefs for single or compound disturbances
   # Returns event_counts, reef_df, overall_unknown_count
@@ -385,13 +397,13 @@ for (epsilon in list_epsilon) {
     cyc_dist, dhw_dist, infer_baseline, epsilon,
     baseline_str
   )
-
+  
   # Extract the list elements
   event_counts <- sing_comp_list[[1]]
   all_reefs_sf <- sing_comp_list[[2]]
   reef_df <- sing_comp_list[[3]] %>%
     mutate(epsilon_val = epsilon)
-
+  
   reef_df_all[(nrow(reef_df_all) + 1):(nrow(reef_df_all) + nrow(reef_df)), 1:ncol(reef_df)] <- reef_df
   i <- i + 1
 }
@@ -413,62 +425,66 @@ reef_df_all_sens3$num_disturbances <- as.numeric(reef_df_all_sens3$num_disturban
 dc_sens_3_df <- reef_df_all_sens3 %>%
   group_by(epsilon_val, dist_type) %>%
   summarise(mean = mean(num_disturbances, na.rm = TRUE),
-      sd = sd(num_disturbances, na.rm = TRUE),
-      n = n()) %>%
+            sd = sd(num_disturbances, na.rm = TRUE),
+            n = n()) %>%
   mutate(se = sd / sqrt(n),
-      lower = mean - (1.96 * se),
-      upper = mean + (1.96 * se),
-      sum_sc_means = sum(mean[dist_type != "num_total"], na.rm = TRUE),
-      sum_sc_sds = sum(sd[dist_type != "num_total"], na.rm = TRUE),
-      sum_sc_n = sum(n[dist_type != "num_total"], na.rm = TRUE),
-      sum_sc_se = sum(se[dist_type != "num_total"], na.rm = TRUE),
-      sum_sc_lower = sum(lower[dist_type != "num_total"], na.rm = TRUE),
-      sum_sc_upper = sum(upper[dist_type != "num_total"], na.rm = TRUE))
+         lower = mean - (1.96 * se),
+         upper = mean + (1.96 * se),
+         sum_sc_means = sum(mean[dist_type != "num_total"], na.rm = TRUE),
+         sum_sc_sds = sum(sd[dist_type != "num_total"], na.rm = TRUE),
+         sum_sc_n = sum(n[dist_type != "num_total"], na.rm = TRUE),
+         sum_sc_se = sum(se[dist_type != "num_total"], na.rm = TRUE),
+         sum_sc_lower = sum(lower[dist_type != "num_total"], na.rm = TRUE),
+         sum_sc_upper = sum(upper[dist_type != "num_total"], na.rm = TRUE))
 
 dc_sens_3a <- ggplot(data = dc_sens_3_df[dc_sens_3_df$dist_type != "num_total", ]) +
   geom_point(size = 1, 
-    aes(x = epsilon_val, 
-     y = mean,
-     color = as.factor(dist_type))) +
-  geom_errorbar(aes(x = epsilon_val,
-        ymin = lower,
-        ymax = upper,
-        color = as.factor(dist_type)),
-       width = 0.01) +
+             aes(x = epsilon_val * 100, 
+                 y = mean,
+                 color = as.factor(dist_type))) +
+  geom_errorbar(aes(x = epsilon_val * 100,
+                    ymin = lower,
+                    ymax = upper,
+                    color = as.factor(dist_type)),
+                width = 0.01) +
   geom_point(size = 1, 
-    aes(x = epsilon_val, 
-     y = sum_sc_means,
-        color = "num_total_cat"),
-     color = "grey15") +
-  geom_errorbar(aes(x = epsilon_val,
-        ymin = sum_sc_lower,
-        ymax = sum_sc_upper,
-        color = "num_total_cat"),
-       width = 0.01) +
+             aes(x = epsilon_val * 100, 
+                 y = sum_sc_means,
+                 color = "num_total_cat")) +
+  geom_errorbar(aes(x = epsilon_val * 100,
+                    ymin = sum_sc_lower,
+                    ymax = sum_sc_upper,
+                    color = "num_total_cat"),
+                width = 0.01) +
   geom_hline(yintercept = mean(reef_df_all_sens3$num_disturbances[reef_df_all_sens3$dist_type == "num_total"], 
                                na.rm = TRUE),
-       color = "grey30",
-       linetype = "dashed") +
-  geom_text(aes(x = 0.275,
-        y = mean(reef_df_all_sens3$num_disturbances[reef_df_all_sens3$dist_type == "num_total"], 
-                               na.rm = TRUE) + 0.025,
-        label = "Total Uncategorised Disturbances"),
-       color = "grey30",
-       size = 10 / .pt,
-       hjust = 0.5,
-       vjust = 0) +
+             color = "grey30",
+             linetype = "dotdash") +
+  geom_text(aes(x = 27.5,
+                y = mean(reef_df_all_sens3$num_disturbances[reef_df_all_sens3$dist_type == "num_total"], 
+                         na.rm = TRUE) + 0.025,
+                label = "Total Uncategorised Disturbances"),
+            color = "grey30",
+            size = 10 / .pt,
+            hjust = 0.5,
+            vjust = 0) +
   labs(x = TeX("Disturbance Threshold ($\\epsilon$) Value (%)"), 
-    y = "Average Number of Disturbances",
-    color = "Disturbance Type",
-    tag = "A") +
+       y = "Average Number of Disturbances",
+       color = "Disturbance Type",
+       tag = "A") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
-     axis.text = element_text(size = 10),
-     legend.title = element_text(size = 12),
-     legend.text = element_text(size = 10),
-     legend.position = "bottom") +
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10),
+        legend.position = "bottom",
+        panel.grid.major.y = element_line(linetype = "dashed", "lightgrey")) +
+  scale_x_continuous(limits = c(0, 100),
+                     breaks = seq(0, 100, 20)) +
+  scale_y_continuous(limits = c(0, 3),
+                     breaks = seq(0, 3, 0.5)) +
   scale_color_manual(values = c("num_total_cat" = "grey15", "num_single" = "steelblue1", "num_comp" = "steelblue4"),
-        labels = c("num_total_cat" = "Total Categorised", "num_single" = "Single", "num_comp" = "Cumulative"))
+                     labels = c("num_total_cat" = "Total Categorised", "num_single" = "Single", "num_comp" = "Cumulative"))
 
 # Get the assumed base case (epsilon = 0.05)
 base_case <- reef_df_all_sens3[reef_df_all_sens3$epsilon_val == 0.05, ] %>%
@@ -497,46 +513,47 @@ others <- others %>%
 dc_sens_3_reclassed <- others %>%
   group_by(epsilon_val, dist_type) %>%
   summarise(mean = mean(num_reclassed, na.rm = TRUE),
-      sd = sd(num_reclassed, na.rm = TRUE),
-      n = n()) %>%
+            sd = sd(num_reclassed, na.rm = TRUE),
+            n = n()) %>%
   mutate(se = sd / sqrt(n),
-      lower = mean - (1.96 * se),
-      upper = mean + (1.96 * se))
+         lower = mean - (1.96 * se),
+         upper = mean + (1.96 * se))
 
 # Plot the number of reclassified disturbances from base case on top of dc_sens_3
 dc_sens_3b <- ggplot() +
   geom_smooth(data = dc_sens_3_reclassed,
-    aes(x = epsilon_val,
-      y = mean,
-      color = as.factor(dist_type)),
-    method = "lm",
-    se = TRUE) +
-  geom_hline(yintercept = 0,
-     color = "grey30",
-     linetype = "dashed") +
+              aes(x = epsilon_val * 100,
+                  y = mean,
+                  color = as.factor(dist_type)),
+              method = "lm",
+              se = TRUE) +
   labs(x = TeX("Disturbance Threshold ($\\epsilon$) Value (%)"), 
-    y = "Average Number of Reclassified Disturbances",
-    color = "Disturbance Type",
-    tag = "B") +
+       y = "Average Number of Reclassified Disturbances",
+       color = "Disturbance Type",
+       tag = "B") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
-     axis.text = element_text(size = 10),
-     legend.title = element_text(size = 12),
-     legend.text = element_text(size = 10),
-     legend.position = "bottom") +
-  scale_color_manual(values = c("num_single" = "steelblue1", "num_comp" = "steelblue4"),
-        labels = c("num_single" = "Single", "num_comp" = "Cumulative"))
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10),
+        legend.position = "bottom",
+        panel.grid.major.y = element_line(linetype = "dashed", "lightgrey")) +
+  scale_x_continuous(limits = c(0, 100),
+                     breaks = seq(0, 100, 20)) +
+  scale_color_manual(values = c("num_single" = "steelblue1",
+                                "num_comp" = "steelblue4"),
+                     labels = c("num_single" = "Single",
+                                "num_comp" = "Cumulative"))
 
 # Combine the plots
 dc_sens_3 <- ggarrange(dc_sens_3a, dc_sens_3b, 
                        ncol = 2, nrow = 1, 
                        widths = c(1, 1))
 
-
 # Save the plot
 ggsave(
   paste0(out_path, "/Sens_3.png"),
-  width = 10, height = 5
+  width = 11, height = 5
 )
 ############################################
 
@@ -548,18 +565,18 @@ reef_df_all <- data.frame(matrix(NA, nrow = 0, ncol = 17))
 i <- 1
 for (recov_th in list_recov_th) {
   all_reefs_sf <- all_reefs_sf %>%
-  mutate(
-    is_disturbed = (all_reefs_sf$COTS_value >= cots_dist |
-      all_reefs_sf$Hs4MW_value >= cyc_dist |
-      all_reefs_sf$DHW_value >= dhw_dist),
-    is_impacted = 0,
-    single_or_compound = NA,
-    dist_type = NA,
-    recov_year = NA,
-    recov_time = NA,
-    r_given_impact = NA
-  )
-
+    mutate(
+      is_disturbed = (all_reefs_sf$COTS_value >= cots_dist |
+                        all_reefs_sf$Hs4MW_value >= cyc_dist |
+                        all_reefs_sf$DHW_value >= dhw_dist),
+      is_impacted = 0,
+      single_or_compound = NA,
+      dist_type = NA,
+      recov_year = NA,
+      recov_time = NA,
+      r_given_impact = NA
+    )
+  
   # SINGLE OR COMPOUND DIST
   # Analyse reefs for single or compound disturbances
   # Returns event_counts, reef_df, overall_unknown_count
@@ -569,13 +586,13 @@ for (recov_th in list_recov_th) {
     cyc_dist, dhw_dist, infer_baseline, epsilon,
     baseline_str
   )
-
+  
   # Extract the list elements
   event_counts <- sing_comp_list[[1]]
   all_reefs_sf <- sing_comp_list[[2]]
   reef_df <- sing_comp_list[[3]] %>%
     mutate(recov_th_val = recov_th)
-
+  
   reef_df_all[(nrow(reef_df_all) + 1):(nrow(reef_df_all) + nrow(reef_df)), 1:ncol(reef_df)] <- reef_df
   i <- i + 1
 }
@@ -598,32 +615,42 @@ dc_sens_4_df <- reef_df_all %>%
        value.name = "prob_recov") %>%
   group_by(recov_th_val, dist_type) %>%
   summarise(mean = mean(as.numeric(prob_recov), na.rm = TRUE),
-      sd = sd(as.numeric(prob_recov), na.rm = TRUE),
-      n = n()) %>%
+            sd = sd(as.numeric(prob_recov), na.rm = TRUE),
+            n = n()) %>%
   mutate(se = sd / sqrt(n),
-      lower = mean - (1.96 * se),
-      upper = mean + (1.96 * se))
+         lower = mean - (1.96 * se),
+         upper = mean + (1.96 * se))
 
 dc_sens_4 <- ggplot(data = dc_sens_4_df, 
-       aes(x = recov_th_val * 100,
-            y = mean * 100,
-            color = as.factor(dist_type))) +
+                    aes(x = recov_th_val * 100,
+                        y = mean * 100,
+                        color = as.factor(dist_type))) +
   geom_point(size = 1) +
-  geom_errorbar(aes(ymin = lower,
-                    ymax = upper),
+  geom_errorbar(aes(ymin = lower * 100,
+                    ymax = upper * 100),
                 width = 0.01) +
   geom_smooth(method = "loess",
               se = TRUE) +
-  labs(x = TeX("Recovery Threshold (1 - $\\rho$) Value (%)"),
-        y = "Probability of Recovery (%)",
-        color = "Disturbance Type") +
+  labs(x = TeX("Recovery Threshold ($\\rho$) Value (%)"),
+       y = "Probability of Recovery (%)",
+       color = "Disturbance Type") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
         axis.text = element_text(size = 10),
         legend.title = element_text(size = 12),
-        legend.text = element_text(size = 10)) +
-  scale_color_manual(values = c("prob_s_recov" = "steelblue1", "prob_c_recov" = "steelblue4"),
-                    labels = c("prob_s_recov" = "Single", "prob_c_recov" = "Cumulative"))
+        legend.text = element_text(size = 10),
+        legend.position = c(0.05, 0.05),
+        legend.justification = c(0, 0),
+        legend.background = element_blank(),
+        panel.grid.major.y = element_line(linetype = "dashed", "lightgrey")) +
+  scale_x_continuous(limits = c(0, 100),
+                     breaks = seq(0, 100, 20)) +
+  scale_y_continuous(limits = c(0, 100),
+                     breaks = seq(0, 100, 20)) +
+  scale_color_manual(values = c("prob_s_recov" = "steelblue1",
+                                "prob_c_recov" = "steelblue4"),
+                     labels = c("prob_s_recov" = "Single",
+                                "prob_c_recov" = "Cumulative"))
 
 # Save the plot
 ggsave(

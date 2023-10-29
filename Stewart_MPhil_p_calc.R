@@ -35,16 +35,24 @@ p_calculator <- function(reef_data, mgmt_benefit) {
       # Sample from the distribution of non-NA recovery rates in the management area/sector
       reef_data$r_single_unmgd[reef] <- ifelse(length(sector_s_recovs) == 0 || is.na(sd(sector_s_recovs)),
                                                rnorm(n = 1,
-                                                     mean = mean(reef_data$prob_s_recov[!is.na(reef_data$prob_s_recov)]),
-                                                     sd = sd(reef_data$prob_s_recov[!is.na(reef_data$prob_s_recov)])) %>%
+                                                     mean = mean(reef_data$prob_s_recov,
+                                                                 na.rm = TRUE),
+                                                     sd = sd(reef_data$prob_s_recov,
+                                                             na.rm = TRUE)) %>%
                                                  as.numeric(),
                                                rnorm(n = 1, 
-                                                     mean = mean(sector_s_recovs), 
-                                                     sd = sd(sector_s_recovs)) %>%
+                                                     mean = mean(sector_s_recovs,
+                                                                 na.rm = TRUE), 
+                                                     sd = sd(sector_s_recovs,
+                                                             na.rm = TRUE)) %>%
                                                  as.numeric())
       if (is.na(reef_data$r_single_unmgd[reef]) || 
           is.nan(reef_data$r_single_unmgd[reef])) {
-        stop(paste("r_single_unmgd =", reef_data$r_single_unmgd[reef]))
+        reef_data$pr_recov_sing_unmgd[reef] <- NA
+        reef_data$pr_recov_comp_unmgd[reef] <- NA
+        reef_data$pr_recov_sing_mgd[reef] <- NA
+        reef_data$pr_recov_comp_mgd[reef] <- NA
+        next
       }
     } 
     reef_data$r_single_mgd[reef] <- 1 - mgmt_benefit * (1 - as.numeric(reef_data$r_single_unmgd[reef]))
@@ -59,16 +67,24 @@ p_calculator <- function(reef_data, mgmt_benefit) {
       # Sample from the distribution of non-NA recovery rates in the management area/sector
       reef_data$r_comp_unmgd[reef] <- ifelse(length(sector_c_recovs) == 0 || is.na(sd(sector_c_recovs)),
                                              rnorm(n = 1,
-                                                   mean = mean(reef_data$prob_c_recov[!is.na(reef_data$prob_c_recov)]),
-                                                   sd = sd(reef_data$prob_c_recov[!is.na(reef_data$prob_c_recov)])) %>%
+                                                   mean = mean(reef_data$prob_c_recov,
+                                                               na.rm = TRUE),
+                                                   sd = sd(reef_data$prob_c_recov,
+                                                           na.rm = TRUE)) %>%
                                                as.numeric(),
                                              rnorm(1, 
-                                                   mean = mean(sector_c_recovs), 
-                                                   sd = sd(sector_c_recovs)) %>%
+                                                   mean = mean(sector_c_recovs,
+                                                               na.rm = TRUE), 
+                                                   sd = sd(sector_c_recovs,
+                                                           na.rm = TRUE)) %>%
                                                as.numeric())
       if (is.na(reef_data$r_comp_unmgd[reef]) || 
           is.nan(reef_data$r_comp_unmgd[reef])) {
-        stop(paste("r_comp_unmgd =", reef_data$r_comp_unmgd[reef]))
+        reef_data$pr_recov_sing_unmgd[reef] <- NA
+        reef_data$pr_recov_comp_unmgd[reef] <- NA
+        reef_data$pr_recov_sing_mgd[reef] <- NA
+        reef_data$pr_recov_comp_mgd[reef] <- NA
+        next
       }
     }
     reef_data$r_comp_mgd[reef] <-  1 - mgmt_benefit * (1 - as.numeric(reef_data$r_comp_unmgd[reef]))
@@ -104,7 +120,8 @@ p_calculator <- function(reef_data, mgmt_benefit) {
     D_stewart_num <- eigs$values # eigenvalues
     ind <- which.max(D_stewart_num)
     reef_data$pr_recov_sing_mgd[reef] <- V_stewart_num[1, ind] /
-      (sum(V_stewart_num[, ind])) # scale the first (i.e. 'recov') entry
+      (sum(V_stewart_num[, ind],
+           na.rm = TRUE)) # scale the first (i.e. 'recov') entry
     
     # Calculate probability of recovered state for area if not managed in single model
     ri <- reef_data$r_single_unmgd[reef]
@@ -121,7 +138,8 @@ p_calculator <- function(reef_data, mgmt_benefit) {
     D_stewart_num <- eigs$values # eigenvalues
     ind <- which.max(D_stewart_num)
     reef_data$pr_recov_sing_unmgd[reef] <- V_stewart_num[1, ind] /
-      (sum(V_stewart_num[, ind])) # scale the first (i.e. 'recov') entry
+      (sum(V_stewart_num[, ind],
+           na.rm = TRUE)) # scale the first (i.e. 'recov') entry
     
     # Calculate probability of recovered state for area if managed
     # Prob disturbance in area
@@ -163,7 +181,8 @@ p_calculator <- function(reef_data, mgmt_benefit) {
     D_stewart_num <- eigs$values # eigenvalues
     ind <- which.max(D_stewart_num)
     reef_data$pr_recov_comp_mgd[reef] <- V_stewart_num[1, ind] /
-      (sum(V_stewart_num[, ind])) # scale the first (i.e. 'recov') entry
+      (sum(V_stewart_num[, ind],
+           na.rm = TRUE)) # scale the first (i.e. 'recov') entry
     
     # Calculate probability of recovered state for area if not managed
     r1 <- reef_data$r_single_unmgd[reef] #%>%
@@ -196,7 +215,8 @@ p_calculator <- function(reef_data, mgmt_benefit) {
     D_stewart_num <- eigs$values # eigenvalues
     ind <- which.max(D_stewart_num)
     reef_data$pr_recov_comp_unmgd[reef] <- V_stewart_num[1, ind] /
-      (sum(V_stewart_num[, ind])) # scale the first (i.e. 'recov') entry
+      (sum(V_stewart_num[, ind],
+           na.rm = TRUE)) # scale the first (i.e. 'recov') entry
   }
   
   return(reef_data)

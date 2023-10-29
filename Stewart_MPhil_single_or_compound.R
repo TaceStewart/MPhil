@@ -142,12 +142,12 @@ single_or_compound <- function(obs_by_reef, is_time_based, recov_th, recov_yrs,
                 # Set recovery year to unknown
                 obs_by_reef$recov_year[dist_index] <- "Unknown - no post obs"
               } else {
-                # Find next observation with at least max_pre_dist_cover*recov_th
+                # Find next observation with at least max_pre_dist_cover * (1 - recov_th)
                 post_rec_index <- which(obs_by_reef$COVER[dist_index + 1:nrow(obs_by_reef)] > 
-                                          max_pre_dist_cover * recov_th & 
+                                          max_pre_dist_cover * (1 - recov_th) & 
                                           obs_by_reef$COVER[dist_index + 1:nrow(obs_by_reef)] >
                                           min(obs_by_reef$COVER[dist_index:nrow(obs_by_reef) - 1]))[1] + dist_index
-                # If there are no obs with at least recov_th*max_pre_dist_cover
+                # If there are no obs with at least (1 - recov_th) * max_pre_dist_cover
                 if (is.na(post_rec_index)) {
                   obs_by_reef$recov_year[dist_index] <- "Unknown - no post-disturbance growth"
                   

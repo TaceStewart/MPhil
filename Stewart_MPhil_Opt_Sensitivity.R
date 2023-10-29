@@ -82,8 +82,8 @@ sector_boundaries <- st_read(shapefile_path,
 # Variables
 base_recov_th <- 0.75
 base_mgmt_ben <- 0.5
-list_recov_th <- seq(0.05, 1, by = 0.05)
-list_mgmt_ben <- seq(0, 1, by = 0.1)
+list_recov_th <- seq(0, 1, by = 0.05)
+list_mgmt_ben <- seq(0, 1, by = 0.05)
 list_recov_yrs <- seq(1, 15, by = 1)
 infer_baseline <- 1 # Should the baseline be inferred if non-existent at start of obs period?
 epsilon <- 0.05
@@ -118,7 +118,7 @@ is_time_based <- FALSE
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 100 # try 100
+n_sims <- 1000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -237,18 +237,26 @@ for (recov_th in list_recov_th) {
             all_samples[from_row:to_row, 1:length(column_names)] <- sample_reefs_df %>%
                 subset(select = column_names)
             
-            # Calculate single disturbance solution
-            sing_result <- optimiser_single(sample_reefs_df, mgmt_constraint)
+            if(any(!is.na(sample_reefs_df$pr_recov_sing_unmgd) &
+                   !is.na(sample_reefs_df$pr_recov_sing_mgd))) {
+                # Calculate single disturbance solution
+                sing_result <- optimiser_single(sample_reefs_df, mgmt_constraint)
+                
+                # Get the reefs to manage from solution
+                sol_s <- get_solution(sing_result, y[i])$value
+                all_samples[from_row:to_row, "is_managed_single"] <- sol_s
+            }
             
-            # Calculate compound disturbance solution
-            comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint)
             
-            # Get the reefs to manage from solution
-            sol_s <- get_solution(sing_result, y[i])$value
-            sol_c <- get_solution(comp_result, y[i])$value
-            
-            all_samples[from_row:to_row, "is_managed_single"] <- sol_s
-            all_samples[from_row:to_row, "is_managed_cumul"] <- sol_c
+            if(any(!is.na(sample_reefs_df$pr_recov_comp_unmgd) &
+                   !is.na(sample_reefs_df$pr_recov_comp_mgd))) {
+                # Calculate compound disturbance solution
+                comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint)
+                
+                # Get the reefs to manage from solution
+                sol_c <- get_solution(comp_result, y[i])$value
+                all_samples[from_row:to_row, "is_managed_cumul"] <- sol_c
+            }
         }
         
         # Save all_samples in list
@@ -279,7 +287,7 @@ for (recov_th in list_recov_th) {
         expected_recov_reefs_nm <- all_samples %>%
             group_by(sim_num) %>%
             summarise(num_recov_nm = sum(pr_recov_comp_unmgd,
-                                        na.rm = TRUE)
+                                         na.rm = TRUE)
             )
         
         # Save the results
