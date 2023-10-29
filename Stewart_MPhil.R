@@ -104,10 +104,8 @@ recov_yrs <- 5
 #  Note: for recovery-overlap compounding only
 recov_th <- 0.75
 
-# Management benefit 
-# (currently % added to mgd reef recovery rate)
-# NEW (% of annual prob not recovering)
-mgmt_benefit <- 0.5
+# Management benefit (% of annual prob not recovering)
+mgmt_benefit <- 0.75
 
 # Management constraint (base: 20% of number of reefs in system)
 mgmt_constraint <- 0.2
@@ -259,13 +257,13 @@ reef_df <- p_calculator(reef_df, mgmt_benefit)
 # GBRMPA Management Areas
 rebe_coords_xy <- all_reefs_sf$geometry[which(grepl("Rebe", 
                                                     all_reefs_sf$REEF_NAME,
-                                                    ignore.case = T))] %>% 
+                                                    ignore.case = TRUE))] %>% 
   st_coordinates()
 coordinates_xy <- st_coordinates(all_reefs_sf$geometry)
 map_data <- sector_boundaries
 map_data$NUM_REEFS <- 0
 unique_rfs <- unique(all_reefs_sf[, c("REEF_NAME", "AREA_DESCR")])
-for (sector_row in 1:nrow(map_data)) {
+for (sector_row in seq_len(nrow(map_data))) {
   map_data$NUM_REEFS[sector_row] <- sum(unique_rfs$AREA_DESCR == 
                                           map_data$AREA_DESCR[sector_row])
 }
@@ -278,7 +276,7 @@ leaflet() %>%
               label = ~paste0(gsub(" Management Area", 
                                    "",
                                    AREA_DESCR), " (n = ", NUM_REEFS, ")"),
-              labelOptions = labelOptions(noHide = T, 
+              labelOptions = labelOptions(noHide = TRUE, 
                                           textOnly = TRUE, 
                                           direction = "right",
                                           style = list(
@@ -289,10 +287,27 @@ leaflet() %>%
               color = "grey",
               opacity = 1,
               weight = 2) %>%
+  addCircleMarkers(lng = mean(rebe_coords_xy[, 1]),
+                   lat = mean(rebe_coords_xy[, 2]),
+                   color = "#36648b",
+                   opacity = 1,
+                   weight = 4,
+                   radius = 5,
+                   fill = FALSE) %>%
+  addLabelOnlyMarkers(lng = mean(rebe_coords_xy[, 1] + 1),
+                      lat = mean(rebe_coords_xy[, 2]),
+                      label = "Rebe Reef",
+                      labelOptions = labelOptions(noHide = TRUE, 
+                                                  textOnly = TRUE, 
+                                                  direction = "right",
+                                                  style = list(
+                                                    "color" = "#36648b",
+                                                    "font-weight" = "bold",
+                                                    "font-size" = "18px"))) %>%
   addLabelOnlyMarkers(lng = 140,
                       lat = -25,
                       label = "Queensland",
-                      labelOptions = labelOptions(noHide = T, 
+                      labelOptions = labelOptions(noHide = TRUE, 
                                                   textOnly = TRUE,
                                                   style = list(
                                                     "color" = "grey",
@@ -328,7 +343,7 @@ ggplot() +
         axis.title = element_text(size = 12),
         axis.text = element_text(size = 10))
 ggsave(paste0(out_path, "/DataChapter/Background/BG2.png"), 
-       plot = last_plot(), width = 5, height = 6)
+       plot = last_plot(), width = 5, height = 6, dpi = 300)
 
 ############################################
 
@@ -356,7 +371,7 @@ bg_3a <- ggplot(data = rebe_reef) +
              linetype = "dashed") +
   geom_text(x = 1994.75, y = 13.5, 
             label = "Disturbance\nThreshold") +
-  labs(x = "Year",
+  labs(x = "Observation Year",
        y = "Hours of 4m+ Wave Height",
        tag = "A") + 
   scale_colour_manual(values = colors) +
@@ -379,7 +394,7 @@ bg_3b <- ggplot(data = rebe_reef) +
              linetype = "dashed") +
   geom_text(x = 1994.75, y = 4.75, 
             label = "Disturbance\nThreshold") +
-  labs(x = "Year",
+  labs(x = "Observation Year",
        y = "Degree Heating Weeks",
        tag = "B") + 
   scale_colour_manual(values = colors) +
@@ -403,7 +418,7 @@ bg_3c <- ggplot(data = rebe_reef) +
              linetype = "dashed") +
   geom_text(x = 1994.75, y = 1.3, 
             label = "Disturbance\nThreshold") +
-  labs(x = "Year",
+  labs(x = "Observation Year",
        y = "Average COTS per Manta-Tow",
        tag = "C") + 
   scale_colour_manual(values = colors) +
@@ -418,7 +433,7 @@ ggarrange(bg_3a, bg_3b, bg_3c,
 
 # Save
 ggsave(paste0(out_path, "/DataChapter/Background/BG3.png"), 
-       plot = last_plot(), width = 7, height = 8)
+       plot = last_plot(), width = 7, height = 8, dpi = 300)
 ############################################
 
 ############ DATA CHAPTER BG 4 #############
@@ -453,8 +468,8 @@ bg_4a <- ggplot(data = rebe_reef,
             alpha = 0.75) +
   scale_colour_manual(na.translate = F,
                       values = colors) +
-  labs(x = "Year",
-       y = "Cover (%)",
+  labs(x = "Observation Year",
+       y = "Coral Cover (%)",
        tag = "A") + 
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(limits = c(0, 50), 
@@ -503,7 +518,7 @@ bg_4b <- ggplot(data = rebe_reef) +
              colour = "Red",
              linetype = "dashed") +
   scale_colour_manual(values = colors) +
-  labs(x = "Year",
+  labs(x = "Observation Year",
        y = "% of Disturbance Threshold",
        tag = "B",
        colour = "Disturbance Type") + 
@@ -518,7 +533,7 @@ ggarrange(bg_4a, bg_4b,
 
 # Save
 ggsave(paste0(out_path, "/DataChapter/Background/BG4.png"),
-       plot = last_plot(), width = 7, height = 6)
+       plot = last_plot(), width = 7, height = 6, dpi = 300)
 ############################################
 
 ############ DATA CHAPTER BG 5 #############
@@ -613,8 +628,8 @@ ggplot(data = rebe_reef,
             alpha = 0.75) +
   scale_colour_manual(na.translate = FALSE,
                       values = colors) +
-  labs(x = "Year",
-       y = "Cover (%)",
+  labs(x = "Observation Year",
+       y = "Coral Cover (%)",
        colour = "Disturbance Type") + 
   scale_x_continuous(breaks = c(1995, 2000, 2005, 2010, 2015)) +
   scale_y_continuous(limits = c(0, 50), 
@@ -622,7 +637,7 @@ ggplot(data = rebe_reef,
 
 # Save
 ggsave(paste0(out_path, "/DataChapter/Background/BG6unedited.png"),
-       plot = last_plot(), width = 7, height = 3)
+       plot = last_plot(), width = 7, height = 3, dpi = 300)
 ############################################
 
 ############ DATA CHAPTER VIS 1 ############
@@ -638,12 +653,12 @@ all_baselines <- all_beta_minus_eps / (1 - epsilon)
 
 dc_1a <- ggplot(data = data.frame(all_baselines = all_baselines), 
        aes(x = all_baselines)) +
-  geom_histogram(aes(y = after_stat(density)),
+  geom_histogram(aes(y = after_stat(density) * 100),
                  color = "grey30", 
                  fill = "white",
                  alpha = 0.75,
                  linewidth = 0.75) +
-  geom_density(aes(y = after_stat(density)),
+  geom_density(aes(y = after_stat(density) * 100),
                color = "black",
                alpha = 0.75,
                linewidth = 1) +
@@ -652,7 +667,7 @@ dc_1a <- ggplot(data = data.frame(all_baselines = all_baselines),
              linewidth = 1,
              color = "#FC4E07") +
   labs(x = "Initial Baseline Coral Cover (%)", 
-       y = "Density",
+       y = "Proportion of Reefs (%)",
        tag = "A") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
@@ -669,12 +684,12 @@ dc_1b_means <- reef_df %>%
 # Distribution of initial baseline values by management area
 dc_1b <- ggplot(data = reef_df,
                 aes(x = baseline_vals)) +
-  geom_histogram(aes(y = after_stat(density)),
+  geom_histogram(aes(y = after_stat(density) * 100),
                  color = "grey30", 
                  fill = "white",
                  alpha = 0.75,
                  linewidth = 0.75) +
-  geom_density(aes(y = after_stat(density)),
+  geom_density(aes(y = after_stat(density) * 100),
                 color = "black",
                 alpha = 0.75,
                 linewidth = 1) +
@@ -684,7 +699,7 @@ dc_1b <- ggplot(data = reef_df,
               linewidth = 1,
               color = "#FC4E07") +
   labs(x = "Initial Baseline Coral Cover (%)",
-        y = "Density",
+        y = "Proportion of Reefs (%)",
         tag = "B") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
@@ -709,7 +724,7 @@ ggarrange(dc_1a, dc_1b,
 
 # Save
 ggsave(paste0(out_path, "/DataChapter/Results/DC_1.png"),
-       plot = last_plot(), width = 8, height = 5)
+       plot = last_plot(), width = 8, height = 5, dpi = 300)
 ############################################
 
 ############ DATA CHAPTER VIS 2 ############
@@ -737,8 +752,7 @@ dc_2a <- ggplot() +
   ) +
   labs(x = "Longitude",
        y = "Latitude",
-       fill = "Average Number\nof Disturbances",
-       tag = "A")
+       fill = "Average Number\nof Disturbances")
 
 dc_2b <- ggplot() +
   theme_classic() +
@@ -758,8 +772,7 @@ dc_2b <- ggplot() +
   ) +
   labs(x = "Longitude",
        y = "Latitude",
-       fill = "Average Number\nof Disturbances",
-       tag = "B")
+       fill = "Average Number\nof Disturbances")
 
 p <- ggplot_build(dc_2a)$data[[2]]
 q <- ggplot_build(dc_2b)$data[[2]]
@@ -801,8 +814,7 @@ dc_2c <- ggplot(data = dc_2c_df,
   coord_flip() +
   theme_classic() +
   labs(x = "Management Area",
-       y = "Number of Disturbances",
-       tag = "C") +
+       y = "Number of Disturbances") +
   theme(legend.background = element_blank(),
         legend.position = c(1, 1),
         legend.justification = c(1, 1),
@@ -813,9 +825,10 @@ dc_2c <- ggplot(data = dc_2c_df,
         axis.text = element_text(size = 10)) +
   scale_y_continuous(breaks = seq(0, max(reef_df[, c("num_single", "num_comp")]), 1),
                       limits = c(0, max(reef_df[, c("num_single", "num_comp")]))) +
-  scale_fill_manual(values = c("steelblue1", "steelblue4"),
-                    name = "Disturbance Type",
-                    labels = c("Single", "Cumulative"))
+  scale_fill_manual(name = "Disturbance Type",
+                    values = c("num_single" = "steelblue1", "num_comp" = "steelblue4"),
+                    breaks = c("num_single", "num_comp"),
+                    labels = c("num_single" = "Single", "num_comp" = "Cumulative"))
 
 # Combine the plots
 dc_2ab <- ggarrange(dc_2a, dc_2b,
@@ -830,9 +843,14 @@ dc_2 <- ggarrange(dc_2ab, dc_2c,
       widths = c(0.5, 0.5),
       align = "h"
 )
+
+library(patchwork)
+(dc_2a | dc_2b) / dc_2c + 
+  plot_annotation(tag_levels ="A") +
+  plot_layout(guides = 'collect')
 # Save
 ggsave(paste0(out_path, "/DataChapter/Results/DC_2.png"),
-       plot = last_plot(), width = 12, height = 7)
+       plot = last_plot(), width = 10, height = 7, dpi = 300)
 ############################################
 
 ############ DATA CHAPTER VIS 3 ############
@@ -853,7 +871,7 @@ dc_1_df <- data.frame(
            dc_1_vals2["Recovered"], dc_1_vals2["Impacted by Compound"], dc_1_vals2["Impacted by Single"],
            dc_1_vals3["Recovered"], dc_1_vals3["Impacted by Compound"], dc_1_vals3["Impacted by Single"],
            dc_1_vals4["Recovered"], dc_1_vals4["Impacted by Compound"], dc_1_vals4["Impacted by Single"]),
-  col = rep(c("green", "steelblue4", "steelblue1"), 4),
+  col = rep(c("#A9D18E", "steelblue4", "steelblue1"), 4),
   fct = c(rep(unique_mgmts[1], 3), rep(unique_mgmts[2], 3), 
           rep(unique_mgmts[3], 3), rep(unique_mgmts[4], 3))
 )
@@ -868,7 +886,7 @@ dc_1_plot <- dc_1_df %>%
   labs(fill = NULL, colour = NULL) +
   theme_ipsum_rc(grid = "") +
   theme_enhance_waffle() +
-  scale_fill_manual(name = "Reef State",
+  scale_fill_manual(name = "Reef State (1 tile = 1% of reefs in management area)",
                     values = c("#A9D18E", "steelblue4", "steelblue1"),
                     breaks = c("Recovered", "Impacted by Compound", "Impacted by Single"),
                     labels = c("Recovered", "Impacted by Cumulative Disturbance", "Impacted by Single Disturbance"))
@@ -897,7 +915,7 @@ dc_1_plot +
 
 # Save
 ggsave(paste0(out_path, "/DataChapter/Results/DC_3.png"),
-       plot = last_plot(), width = 10, height = 4)
+       plot = last_plot(), width = 10, height = 4, dpi = 300)
 
 ############################################
 
@@ -925,7 +943,7 @@ dc_4a <- ggplot(data = dc_4a_df,
   coord_flip() +
   theme_classic() +
   labs(x = "Management Area",
-       y = "Probability of Disturbance",
+       y = "Probability of Disturbance (%)",
        tag = "A") +
   theme(legend.position = "bottom",
         legend.background = element_blank(),
@@ -963,7 +981,7 @@ dc_4b <- ggplot(data = dc_4b_df,
   coord_flip() +
   theme_classic() +
   labs(x = "Management Area",
-       y = "Probability of Impact",
+       y = "Probability of Impact (%)",
        tag = "B") +
   theme(legend.position = "bottom",
         legend.background = element_blank(),
@@ -988,7 +1006,7 @@ dc_4c_df <- reef_df %>%
                values_to = "pr_recov")
 
 dc_4c <- ggplot(data = dc_4c_df,
-                aes(y = pr_recov,
+                aes(y = pr_recov * 100,
                     x = factor(sector, 
                     levels = c("Mackay/Capricorn Management Area",
                              "Townsville/Whitsunday Management Area",
@@ -1003,7 +1021,7 @@ dc_4c <- ggplot(data = dc_4c_df,
   coord_flip() +
   theme_classic() +
   labs(x = "Management Area",
-       y = "Probability of Recovery",
+       y = "Probability of Recovery (%)",
        tag = "C") +
   theme(legend.position = "bottom",
         legend.background = element_blank(),
@@ -1014,8 +1032,8 @@ dc_4c <- ggplot(data = dc_4c_df,
         axis.text.x = element_text(size = 10),
         axis.title.y = element_blank(),
         axis.text.y = element_blank()) +
-  scale_y_continuous(breaks = seq(0, 1, 0.2),
-                      limits = c(0, 1)) +
+  scale_y_continuous(breaks = seq(0, 100, 20),
+                      limits = c(0, 100)) +
   scale_fill_manual(values = c("prob_s_recov" = "steelblue1", 
                                "prob_c_recov" = "steelblue4"),
                     name = "Disturbance Type",
@@ -1029,7 +1047,7 @@ dc_4 <- ggarrange(dc_4a, dc_4b, dc_4c,
 )
 # Save
 ggsave(paste0(out_path, "/DataChapter/Results/DC_4.png"),
-       plot = last_plot(), width = 12, height = 4)
+       plot = last_plot(), width = 12, height = 4, dpi = 300)
 ############################################
 
 ################# SAMPLING #################
@@ -1189,7 +1207,7 @@ if (is_time_based) {
       out_path, "/OptVis1_2_TimeBased",
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
-    plot = last_plot(), width = 8, height = 5
+    plot = last_plot(), width = 8, height = 5, dpi = 300
   )
 } else {
   ggsave(
@@ -1197,7 +1215,7 @@ if (is_time_based) {
       out_path, "/OptVis1_2_RecovBased",
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
-    plot = last_plot(), width = 8, height = 5
+    plot = last_plot(), width = 8, height = 5, dpi = 300
   )
 }
 ############################################
@@ -1340,7 +1358,7 @@ if (is_time_based) {
       out_path, "/OptVis2_TimeBased",
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
-    plot = last_plot(), width = 12, height = 7
+    plot = last_plot(), width = 12, height = 7, dpi = 300
   )
 } else {
   ggsave(
@@ -1348,7 +1366,7 @@ if (is_time_based) {
       out_path, "/OptVis2_RecovBased",
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
-    plot = last_plot(), width = 12, height = 7
+    plot = last_plot(), width = 12, height = 7, dpi = 300
   )
 }
 
@@ -1452,8 +1470,11 @@ ggplot(all_samples, aes(x = prob_c_dist)) +
 # and by management scenario
 opt_vis_3 <- ggplot(all_samples, 
                     aes(x = num_dist, 
-                        fill = scenario_managed)) +
-  geom_density(alpha = 0.5) +
+                        color = scenario_managed)) +
+  geom_density(aes(y = after_stat(density) * 100),
+               alpha = 0.5,
+               linewidth = 1,
+               adjust = 2) +
   theme_classic() +
   theme(
     legend.position = c(0.975, 0.975),
@@ -1465,8 +1486,8 @@ opt_vis_3 <- ggplot(all_samples,
   scale_fill_manual(values = cols) +
   labs(
     x = "Number of Disturbances at Reef",
-    y = "Density of Reefs",
-    fill = "Scenario Managed"
+    y = "Proportion of Reefs (%)",
+    color = "Scenario Managed"
   )
 
 # Save plot
@@ -1476,7 +1497,7 @@ if (is_time_based) {
       out_path, "/OptVis3_TimeBased",
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
-    plot = opt_vis_3, width = 5, height = 5
+    plot = opt_vis_3, width = 5, height = 5, dpi = 300
   )
 } else {
   ggsave(
@@ -1484,7 +1505,7 @@ if (is_time_based) {
       out_path, "/OptVis3_RecovBased",
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
-    plot = opt_vis_3, width = 5, height = 5
+    plot = opt_vis_3, width = 5, height = 5, dpi = 300
   )
 }
 ############################################
@@ -1628,7 +1649,7 @@ if (is_time_based) {
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
     plot = opt_vis_4,
-    width = 9, height = 5
+    width = 9, height = 5, dpi = 300
   )
 } else {
   ggsave(
@@ -1637,7 +1658,7 @@ if (is_time_based) {
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
     plot = opt_vis_4,
-    width = 9, height = 5
+    width = 9, height = 5, dpi = 300
   )
 }
 

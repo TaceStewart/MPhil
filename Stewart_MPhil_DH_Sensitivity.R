@@ -183,7 +183,7 @@ mu <- reef_df_all %>%
 # Part A: Overall
 dc_sens_1a <- ggplot(data = reef_df_all, 
        aes(x = initial_bl)) +
-  geom_density(aes(y = after_stat(density),
+  geom_density(aes(y = after_stat(density) * 100,
                fill = factor(baseline_infer_bool,
                              levels = c(1, 0))),
                alpha = 0.4,
@@ -196,7 +196,7 @@ dc_sens_1a <- ggplot(data = reef_df_all,
              linetype = "dashed", 
              linewidth = 1) +
   labs(x = "Initial Baseline Coral Cover (%)", 
-       y = "Density",
+       y = "Proportion of Reefs (%)",
        fill = "Baseline Inferred?",
        color = "Baseline Inferred?",
        tag = "A") +
@@ -216,7 +216,7 @@ mu_1b <- reef_df_all %>%
   summarise(grp.mean = mean(initial_bl, na.rm = TRUE))
 dc_sens_1b <- ggplot(data = reef_df_all, 
     aes(x = initial_bl)) +
-  geom_density(aes(y = after_stat(density),
+  geom_density(aes(y = after_stat(density) * 100,
       fill = factor(baseline_infer_bool,
               levels = c(1, 0))),
       alpha = 0.4,
@@ -229,7 +229,7 @@ dc_sens_1b <- ggplot(data = reef_df_all,
        linetype = "dashed", 
        linewidth = 1) +
   labs(x = "Initial Baseline Coral Cover (%)", 
-    y = "Density",
+    y = "Proportion of Reefs",
     fill = "Baseline Inferred?",
     color = "Baseline Inferred?",
     tag = "B") +
@@ -323,7 +323,7 @@ mu <- reef_df_all %>%
 
 ggplot(data = reef_df_all, 
        aes(x = initial_bl)) +
-  geom_density(aes(y = after_stat(density),
+  geom_density(aes(y = after_stat(density) * 100,
                fill = as.factor(baseline_str)),
                alpha = 0.4,
                color = "black",
@@ -334,7 +334,7 @@ ggplot(data = reef_df_all,
              linetype = "dashed", 
              linewidth = 1) +
   labs(x = "Initial Baseline Coral Cover (%)", 
-       y = "Density",
+       y = "Proportion of Reefs",
        fill = "Baseline Estimation Method",
        color = "Baseline Estimation Method") +
   theme_classic() +
@@ -457,7 +457,7 @@ dc_sens_3a <- ggplot(data = dc_sens_3_df[dc_sens_3_df$dist_type != "num_total", 
        size = 10 / .pt,
        hjust = 0.5,
        vjust = 0) +
-  labs(x = "Epsilon Value", 
+  labs(x = TeX("Disturbance Threshold ($\\epsilon$) Value (%)"), 
     y = "Average Number of Disturbances",
     color = "Disturbance Type",
     tag = "A") +
@@ -514,8 +514,8 @@ dc_sens_3b <- ggplot() +
   geom_hline(yintercept = 0,
      color = "grey30",
      linetype = "dashed") +
-  labs(x = "Epsilon Value", 
-    y = "Average Reclassified",
+  labs(x = TeX("Disturbance Threshold ($\\epsilon$) Value (%)"), 
+    y = "Average Number of Reclassified Disturbances",
     color = "Disturbance Type",
     tag = "B") +
   theme_classic() +
@@ -605,8 +605,8 @@ dc_sens_4_df <- reef_df_all %>%
       upper = mean + (1.96 * se))
 
 dc_sens_4 <- ggplot(data = dc_sens_4_df, 
-       aes(x = recov_th_val,
-            y = mean,
+       aes(x = recov_th_val * 100,
+            y = mean * 100,
             color = as.factor(dist_type))) +
   geom_point(size = 1) +
   geom_errorbar(aes(ymin = lower,
@@ -614,8 +614,8 @@ dc_sens_4 <- ggplot(data = dc_sens_4_df,
                 width = 0.01) +
   geom_smooth(method = "loess",
               se = TRUE) +
-  labs(x = TeX("Recovery Threshold (1 - $\\rho$)"),
-        y = "Probability of Recovery",
+  labs(x = TeX("Recovery Threshold (1 - $\\rho$) Value (%)"),
+        y = "Probability of Recovery (%)",
         color = "Disturbance Type") +
   theme_classic() +
   theme(axis.title = element_text(size = 12),
