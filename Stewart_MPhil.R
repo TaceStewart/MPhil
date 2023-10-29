@@ -115,7 +115,7 @@ mgmt_constraint <- 0.2
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 10000 #try 10000
+n_sims <- 1000 #try 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -1157,48 +1157,95 @@ cols_1_3 <- c("General - Actual" = "steelblue1",
               "Single and Cumulative" = "steelblue4",
               "General - Perceived" = "lightblue",
               "None" = "grey")
-opt_vis_1_3 <- ggplot() +
+
+ggplot() +
   geom_bar(
-    data = opt_vis_1_df[c(2:4),],
-    aes(
-      x = reorder(mgmt_plan, benefit_value),
-      y = benefit_value,
-      fill = mgmt_plan
-    ),
-    stat = "identity",
-    position = position_identity()
-  ) +
-  geom_text(data = opt_vis_1_df[c(2:4),], 
+    data = opt_vis_1_df[c(2:3),],
+    mapping = aes(
+             x = reorder(mgmt_plan, benefit_value),
+             y = benefit_value - opt_vis_1_df$benefit_value[4],
+             fill = mgmt_plan
+           ),
+           stat = "identity",
+           position = position_identity()) +
+  geom_text(data = opt_vis_1_df[c(2:3),], 
             aes(x = mgmt_plan,
-                y = 15,
-                label = round(benefit_value, 2)), 
+                y = benefit_value - opt_vis_1_df$benefit_value[4] + 1,
+                label = paste0(round((benefit_value - opt_vis_1_df$benefit_value[4]) / 
+                                      mgmt_constraint, 
+                                    2),
+                              "\n% of managed reefs\n(",
+                              round(benefit_value - opt_vis_1_df$benefit_value[4], 
+                                    2), ")"),
+            col = mgmt_plan), 
             vjust = 1,
-            col = "white",
             size = 12 / .pt) +
   theme_classic() +
   theme(
     panel.grid.minor = element_blank(),
     panel.grid.major.y = element_blank(),
-    axis.text.x = element_text(size = 8),
-    axis.title.x = element_text(size = 9),
+    axis.text.x = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
     axis.text.y = element_blank(),
     axis.title.y = element_blank(),
     axis.ticks = element_blank(),
-    plot.margin = unit(c(-1, -1, -1, -1), "cm"),
-    plot.title = element_text(size = 10,
-                              hjust = 0.5),
     legend.position = "none"
   ) +
   scale_fill_manual(
     name = "",
-    values = cols_1_3[c(1,2,4)]
+    values = cols_1_3[c(1,2)]
   ) +
-  scale_x_discrete(labels = c("None", "General", "Single and\nCumulative")) +
+  scale_color_manual(
+    name = "",
+    values = cols_1_3[c(1,2)]
+  ) +
+  scale_x_discrete(labels = c("General", "Single and\nCumulative")) +
   labs(
-    x = "Management Plan",
-    title = "Number of Reefs Considered\nRecovered Due to Management"
+    x = "Management Plan"
   )
-opt_vis_1_1 + inset_element(opt_vis_1_3, 0.5, 0.6, 0.925, 0.925)
+
+# opt_vis_1_3 <- ggplot() +
+#   geom_bar(
+#     data = opt_vis_1_df[c(2:4),],
+#     aes(
+#       x = reorder(mgmt_plan, benefit_value),
+#       y = benefit_value,
+#       fill = mgmt_plan
+#     ),
+#     stat = "identity",
+#     position = position_identity()
+#   ) +
+#   geom_text(data = opt_vis_1_df[c(2:4),], 
+#             aes(x = mgmt_plan,
+#                 y = 15,
+#                 label = round(benefit_value, 2)), 
+#             vjust = 1,
+#             col = "white",
+#             size = 12 / .pt) +
+#   theme_classic() +
+#   theme(
+#     panel.grid.minor = element_blank(),
+#     panel.grid.major.y = element_blank(),
+#     axis.text.x = element_text(size = 8),
+#     axis.title.x = element_text(size = 9),
+#     axis.text.y = element_blank(),
+#     axis.title.y = element_blank(),
+#     axis.ticks = element_blank(),
+#     plot.margin = unit(c(-1, -1, -1, -1), "cm"),
+#     plot.title = element_text(size = 10,
+#                               hjust = 0.5),
+#     legend.position = "none"
+#   ) +
+#   scale_fill_manual(
+#     name = "",
+#     values = cols_1_3[c(1,2,4)]
+#   ) +
+#   scale_x_discrete(labels = c("None", "General", "Single and\nCumulative")) +
+#   labs(
+#     x = "Management Plan",
+#     title = "Number of Reefs Considered\nRecovered Due to Management"
+#   )
+# opt_vis_1_1 + inset_element(opt_vis_1_3, 0.5, 0.6, 0.925, 0.925)
 
 # Save plot
 if (is_time_based) {
@@ -1411,6 +1458,39 @@ for (sim in 1:n_sims) {
   all_samples[from_row:to_row, 1:length(column_names)] <- sample_reefs_df %>%
     subset(select = column_names)
   
+  if(any(!is.na(sample_reefs_df$pr_recov_sing_unmgd) &
+         !is.na(sample_reefs_df$pr_recov_sing_mgd))) {
+    # Calculate single disturbance solution
+    sing_result <- optimiser_single(sample_reefs_df, mgmt_constraint)
+    
+    # Get the reefs to manage from solution
+    sol_s <- get_solution(sing_result, y[i])$value
+    all_samples[from_row:to_row, "is_managed_single"] <- sol_s
+  }
+  
+  
+  if(any(!is.na(sample_reefs_df$pr_recov_comp_unmgd) &
+         !is.na(sample_reefs_df$pr_recov_comp_mgd))) {
+    # Calculate compound disturbance solution
+    comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint)
+    
+    # Get the reefs to manage from solution
+    sol_c <- get_solution(comp_result, y[i])$value
+    all_samples[from_row:to_row, "is_managed_cumul"] <- sol_c
+  }
+}
+
+for(sim in seq_len(n_sims)) {
+  # Get df indices
+  df_indx <- which(all_samples$sim_num == sim)
+  sample_reefs_df <- all_samples[df_indx, 1:length(column_names)]
+  
+  # Recalculate p
+  sample_reefs_df <- p_calculator(sample_reefs_df, mgmt_benefit)
+  all_samples[df_indx, 1:length(column_names)] <- sample_reefs_df %>%
+    subset(select = column_names)
+  
+  # Re-optimise
   if(any(!is.na(sample_reefs_df$pr_recov_sing_unmgd) &
          !is.na(sample_reefs_df$pr_recov_sing_mgd))) {
     # Calculate single disturbance solution
