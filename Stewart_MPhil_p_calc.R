@@ -54,7 +54,9 @@ p_calculator <- function(reef_data, mgmt_benefit) {
         reef_data$pr_recov_comp_mgd[reef] <- NA
         next
       }
-    } 
+    }
+    reef_data$r_single_unmgd[reef_data$r_single_unmgd < 0] <- 0
+    reef_data$r_single_unmgd[reef_data$r_single_unmgd > 1] <- 1
     reef_data$r_single_mgd[reef] <- 1 - mgmt_benefit * (1 - as.numeric(reef_data$r_single_unmgd[reef]))
     
     if (is.na(reef_data$prob_c_recov[reef])) {
@@ -87,6 +89,8 @@ p_calculator <- function(reef_data, mgmt_benefit) {
         next
       }
     }
+    reef_data$pr_recov_comp_unmgd[reef_data$pr_recov_comp_unmgd < 0] <- 0
+    reef_data$pr_recov_comp_unmgd[reef_data$pr_recov_comp_unmgd > 1] <- 1
     reef_data$r_comp_mgd[reef] <-  1 - mgmt_benefit * (1 - as.numeric(reef_data$r_comp_unmgd[reef]))
     
     # Calculate probability of recovered state for area if managed in single model

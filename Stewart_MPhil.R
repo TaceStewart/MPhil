@@ -102,7 +102,7 @@ recov_yrs <- 5
 
 # Threshold percent of pre-disturbance max cover considered "recovered"
 #  Note: for recovery-overlap compounding only
-recov_th <- 0.75
+recov_th <- 0.25
 
 # Management benefit (% of annual prob not recovering)
 mgmt_benefit <- 0.75
@@ -115,7 +115,7 @@ mgmt_constraint <- 0.2
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 100 #try 10000
+n_sims <- 10000 #try 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -1411,18 +1411,26 @@ for (sim in 1:n_sims) {
   all_samples[from_row:to_row, 1:length(column_names)] <- sample_reefs_df %>%
     subset(select = column_names)
   
-  # Calculate single disturbance solution
-  sing_result <- optimiser_single(sample_reefs_df, mgmt_constraint)
+  if(any(!is.na(sample_reefs_df$pr_recov_sing_unmgd) &
+         !is.na(sample_reefs_df$pr_recov_sing_mgd))) {
+    # Calculate single disturbance solution
+    sing_result <- optimiser_single(sample_reefs_df, mgmt_constraint)
+    
+    # Get the reefs to manage from solution
+    sol_s <- get_solution(sing_result, y[i])$value
+    all_samples[from_row:to_row, "is_managed_single"] <- sol_s
+  }
   
-  # Calculate compound disturbance solution
-  comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint)
   
-  # Get the reefs to manage from solution
-  sol_s <- get_solution(sing_result, y[i])$value
-  sol_c <- get_solution(comp_result, y[i])$value
-  
-  all_samples[from_row:to_row, "is_managed_single"] <- sol_s
-  all_samples[from_row:to_row, "is_managed_cumul"] <- sol_c
+  if(any(!is.na(sample_reefs_df$pr_recov_comp_unmgd) &
+         !is.na(sample_reefs_df$pr_recov_comp_mgd))) {
+    # Calculate compound disturbance solution
+    comp_result <- optimiser_compound(sample_reefs_df, mgmt_constraint)
+    
+    # Get the reefs to manage from solution
+    sol_c <- get_solution(comp_result, y[i])$value
+    all_samples[from_row:to_row, "is_managed_cumul"] <- sol_c
+  }
 }
 
 # Make another column for four types of results
@@ -1511,6 +1519,21 @@ if (is_time_based) {
 ############################################
 
 ############ OPT CHAPTER VIS 4 #############
+opt_vis_4_df <- data.frame(
+  sing_or_cumul = c("General", "Single and Cumulative"),
+  variable = c("General", "Single and Cumulative"),
+  value = c(
+    sum(c(all_samples$pr_recov_comp_mgd[all_samples$is_managed_single == 1],
+          all_samples$pr_recov_comp_unmgd[all_samples$is_managed_single == 0]),
+        na.rm = TRUE) / 
+      n_sims,
+    sum(c(all_samples$pr_recov_comp_mgd[all_samples$is_managed_cumul == 1],
+          all_samples$pr_recov_comp_unmgd[all_samples$is_managed_cumul == 0]),
+        na.rm = TRUE) /
+      n_sims
+  )
+)
+
 x_single <- st_coordinates(single_vals$point_loc)[, 1]
 y_single <- st_coordinates(single_vals$point_loc)[, 2]
 
@@ -1560,35 +1583,7 @@ compound_plot <- ggplot() +
 p <- ggplot_build(single_plot)$data[[2]]
 q <- ggplot_build(compound_plot)$data[[2]]
 
-opt_vis_4 <- data.frame(
-  sing_or_cumul = c("General", "Single and Cumulative"),
-  variable = c("General", "Single and Cumulative"),
-  value = c(
-    sum(c(all_samples$pr_recov_comp_mgd[all_samples$is_managed_single == 1],
-          all_samples$pr_recov_comp_unmgd[all_samples$is_managed_single == 0])) / 
-      n_sims,
-    sum(c(all_samples$pr_recov_comp_mgd[all_samples$is_managed_cumul == 1],
-          all_samples$pr_recov_comp_unmgd[all_samples$is_managed_cumul == 0])) /
-      n_sims
-  )
-)
-
-single_plot <- ggplot() +
-  geom_sf(data = sector_boundaries, lwd = 0.01) +
-  theme_classic() +
-  labs(
-    x = "Longitude",
-    y = "Latitude",
-    tag = "A"
-  ) +
-  stat_summary_hex(
-    data = single_vals,
-    aes(x = x_single, y = y_single, z = is_managed_single),
-    fun = ~sum(.x) / n_sims,
-    binwidth = c(0.5, 0.5),
-    na.rm = TRUE,
-    geom = "hex"
-  ) +
+single_plot <- single_plot +
   scale_fill_gradient2(limits = c(min(p$value, q$value),
                                   max(p$value, q$value)),
                        low = "white",
@@ -1597,29 +1592,14 @@ single_plot <- ggplot() +
   geom_text(aes(x = 146, y = -24,
                 label = TeX(
                   paste("Average $E[R_1] = $",
-                        round(opt_vis_4$value[opt_vis_4$sing_or_cumul == "General"], 2)), 
+                        round(opt_vis_4_df$value[opt_vis_4_df$sing_or_cumul == "General"], 2)), 
                   output = "character")),
             size = 12/.pt,
             parse = TRUE) +
   labs(fill = "Average Number of \nManaged Reefs") +
   theme(plot.tag = element_text())
 
-compound_plot <- ggplot() +
-  geom_sf(data = sector_boundaries, lwd = 0.01) +
-  theme_classic() +
-  labs(
-    x = "Longitude",
-    y = "Latitude",
-    tag = "B"
-  ) +
-  stat_summary_hex(
-    data = compound_vals,
-    aes(x = x_compound, y = y_compound, z = is_managed_cumul),
-    fun = ~sum(.x) / n_sims,
-    binwidth = c(0.5, 0.5),
-    na.rm = TRUE,
-    geom = "hex"
-  ) +
+compound_plot <- compound_plot +
   theme(plot.tag = element_text()) +
   scale_fill_gradient2(limits = c(min(p$value, q$value),
                                   max(p$value, q$value)),
@@ -1629,7 +1609,7 @@ compound_plot <- ggplot() +
   geom_text(aes(x = 146, y = -24,
                 label = TeX(
                   paste("Average $E[R_2] = $",
-                        round(opt_vis_4$value[opt_vis_4$sing_or_cumul == "Single and Cumulative"], 2)), 
+                        round(opt_vis_4_df$value[opt_vis_4_df$sing_or_cumul == "Single and Cumulative"], 2)), 
                   output = "character")),
             size = 12/.pt,
             parse = TRUE) +

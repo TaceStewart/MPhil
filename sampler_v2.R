@@ -76,11 +76,8 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
                                       na.rm = TRUE),
                           sd = sd(reef_df$prob_s_impact[reef_indx],
                                   na.rm = TRUE))
-    if (!is.na(mgmt_prob) && mgmt_prob < 0) {
-      mgmt_prob <- 0
-    } else if (!is.na(mgmt_prob) && mgmt_prob > 1) {
-      mgmt_prob <- 1
-    }
+    mgmt_prob[mgmt_prob < 0] <- 0
+    mgmt_prob[mgmt_prob > 1] <- 1
     sample_reefs_df$prob_s_impact[sample_mgmt_indx] <- mgmt_prob
     
     # Sample the probability of impact from compound disturbance for the management area
@@ -103,11 +100,8 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
                                       na.rm = TRUE),
                           sd = sd(reef_df$prob_c_impact[reef_indx],
                                   na.rm = TRUE))
-    if (!is.na(mgmt_prob) && mgmt_prob < 0) {
-      mgmt_prob <- 0
-    } else if (!is.na(mgmt_prob) && mgmt_prob > 1) {
-      mgmt_prob <- 1
-    }
+    mgmt_prob[mgmt_prob < 0] <- 0
+    mgmt_prob[mgmt_prob > 1] <- 1
     sample_reefs_df$prob_c_impact[sample_mgmt_indx] <- mgmt_prob
     
     # Sample the probability of recovery from single disturbance for the management area
@@ -130,11 +124,8 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
                                       na.rm = TRUE),
                           sd = sd(reef_df$prob_s_recov[reef_indx],
                                   na.rm = TRUE))
-    if (!is.na(mgmt_prob) && mgmt_prob < 0) {
-      mgmt_prob <- 0
-    } else if (!is.na(mgmt_prob) && mgmt_prob > 1) {
-      mgmt_prob <- 1
-    }
+    mgmt_prob[mgmt_prob < 0] <- 0
+    mgmt_prob[mgmt_prob > 1] <- 1
     sample_reefs_df$prob_s_recov[sample_mgmt_indx] <- mgmt_prob
     
     # Sample the probability of recovery from compound disturbance for the management area
@@ -157,11 +148,8 @@ samplerv2 <- function(reef_df, sector_boundaries, sample_reefs, num_samples,
                                       na.rm = TRUE),
                           sd = sd(reef_df$prob_c_recov[reef_indx],
                                   na.rm = TRUE))
-    if (!is.na(mgmt_prob) && mgmt_prob < 0) {
-      mgmt_prob <- 0
-    } else if (!is.na(mgmt_prob) && mgmt_prob > 1) {
-      mgmt_prob <- 1
-    }
+    mgmt_prob[mgmt_prob < 0] <- 0
+    mgmt_prob[mgmt_prob > 1] <- 1
     sample_reefs_df$prob_c_recov[sample_mgmt_indx] <- mgmt_prob
   }
   
