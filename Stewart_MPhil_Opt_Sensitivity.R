@@ -82,8 +82,8 @@ sector_boundaries <- st_read(shapefile_path,
 # Variables
 base_recov_th <- 0.75
 base_mgmt_ben <- 0.5
-list_recov_th <- seq(0, 1, by = 0.05)
-list_mgmt_ben <- seq(0, 1, by = 0.05)
+list_recov_th <- seq(0, 1, by = 0.1)
+list_mgmt_ben <- seq(0, 1, by = 0.1)
 list_recov_yrs <- seq(1, 15, by = 1)
 infer_baseline <- 1 # Should the baseline be inferred if non-existent at start of obs period?
 epsilon <- 0.05
@@ -118,7 +118,7 @@ is_time_based <- FALSE
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 1000
+n_sims <- 500
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -188,8 +188,12 @@ sens_list_1 = replicate(n = nrow(opt_sensitivity_1),
 
 ########### SENSITIVITY 1 LOOP #############
 i = 1
+total = length(list_recov_th) * length(list_mgmt_ben)
 for (recov_th in list_recov_th) {
     for (mgmt_benefit in list_mgmt_ben) {
+        print(paste("Starting i =", i, "out of 121",
+                    "recov_th =", recov_th, 
+                    ", mgmt_benefit =", mgmt_benefit))
         # SINGLE OR COMPOUND DIST
         # Analyse reefs for single or compound disturbances
         # Returns event_counts, reef_df, overall_unknown_count
