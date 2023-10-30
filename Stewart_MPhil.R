@@ -115,7 +115,7 @@ mgmt_constraint <- 0.2
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 1000 #try 10000
+n_sims <- 10000 #try 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -1005,6 +1005,12 @@ dc_4c_df <- reef_df %>%
                names_to = "dist_type",
                values_to = "pr_recov")
 
+dc_4_rec_times <- dc_4c_df %>%
+  group_by(sector, dist_type) %>%
+  summarise(mean = mean(pr_recov, na.rm = TRUE),
+            recov_time = 1/mean,
+            n = sum(!is.na(pr_recov)))
+
 dc_4c <- ggplot(data = dc_4c_df,
                 aes(y = pr_recov * 100,
                     x = factor(sector, 
@@ -1170,11 +1176,11 @@ ggplot() +
            position = position_identity()) +
   geom_text(data = opt_vis_1_df[c(2:3),], 
             aes(x = mgmt_plan,
-                y = benefit_value - opt_vis_1_df$benefit_value[4] + 1,
+                y = benefit_value - opt_vis_1_df$benefit_value[4] + 1.5,
                 label = paste0(round((benefit_value - opt_vis_1_df$benefit_value[4]) / 
                                       mgmt_constraint, 
                                     2),
-                              "\n% of managed reefs\n(",
+                              "%\nof managed reefs\n(",
                               round(benefit_value - opt_vis_1_df$benefit_value[4], 
                                     2), ")"),
             col = mgmt_plan), 
@@ -1185,9 +1191,8 @@ ggplot() +
     panel.grid.minor = element_blank(),
     panel.grid.major.y = element_blank(),
     axis.text.x = element_text(size = 10),
-    axis.title.x = element_text(size = 12),
+    axis.title = element_text(size = 12),
     axis.text.y = element_blank(),
-    axis.title.y = element_blank(),
     axis.ticks = element_blank(),
     legend.position = "none"
   ) +
@@ -1201,7 +1206,8 @@ ggplot() +
   ) +
   scale_x_discrete(labels = c("General", "Single and\nCumulative")) +
   labs(
-    x = "Management Plan"
+    x = "Management Plan",
+    y = "Expected Managed Reefs (%) in a Recovered State"
   )
 
 # opt_vis_1_3 <- ggplot() +
@@ -1302,7 +1308,7 @@ opt_vis_2_df$position_s <- rank(length(opt_vis_2_df$diff_prob_recov_s) -
 opt_vis_2_df$position_c <- rank(length(opt_vis_2_df$diff_prob_recov_c) - 
                                   opt_vis_2_df$diff_prob_recov_c, 
                                 ties.method = "random")
-opt_vis_2_df$change <- opt_vis_2_df$position_c - opt_vis_2_df$position_s
+opt_vis_2_df$change <- opt_vis_2_df$position_s - opt_vis_2_df$position_c
 
 # Melt the dataframe so that there is one position column and another column for the scenario
 opt_vis_2_df <- melt(
@@ -1369,9 +1375,7 @@ opt_vis_2_2 <- ggplot(data = opt_vis_2_df,
   geom_histogram(bins = 50,
                  fill = "steelblue4",
                  colour = "black") +
-  scale_y_continuous(breaks = seq(round(min(opt_vis_2_df$change), digits = -2), 
-                                  round(max(opt_vis_2_df$change), digits = -2), 
-                                  by = 10)) +
+  scale_y_continuous(breaks = seq(-100, 100, by = 10)) +
   scale_x_continuous(breaks = seq(0, 20, by = 2)) +
   geom_hline(yintercept = 0,
              colour = "red",
@@ -1379,13 +1383,13 @@ opt_vis_2_2 <- ggplot(data = opt_vis_2_df,
   labs(y = "Change in Priority When Incorporating Cumulative Disturbances",
        x = "Number of Reefs",
        tag = "B") +
-  geom_text(x = 9,
+  geom_text(x = 16,
             y = 3.5,
             label = "Increase in Priority",
             colour = "grey30",
             size = 10.5 / .pt) +
-  geom_text(x = 9,
-            y = -7,
+  geom_text(x = 16,
+            y = -5,
             label = "Decrease in Priority",
             colour = "grey30",
             size = 10.5 / .pt) +
@@ -1562,7 +1566,7 @@ opt_vis_3 <- ggplot(all_samples,
   geom_density(aes(y = after_stat(density) * 100),
                alpha = 0.5,
                linewidth = 1,
-               adjust = 2) +
+               adjust = 1.75) +
   theme_classic() +
   theme(
     legend.position = c(0.975, 0.975),
@@ -1571,7 +1575,7 @@ opt_vis_3 <- ggplot(all_samples,
     legend.text = element_text(size = 9),
     legend.title = element_text(size = 11)
   ) +
-  scale_fill_manual(values = cols) +
+  scale_color_manual(values = cols) +
   labs(
     x = "Number of Disturbances at Reef",
     y = "Proportion of Reefs (%)",
@@ -1585,7 +1589,7 @@ if (is_time_based) {
       out_path, "/OptVis3_TimeBased",
       recov_yrs, "yr", mgmt_benefit, "mgmt.png"
     ),
-    plot = opt_vis_3, width = 5, height = 5, dpi = 300
+    plot = opt_vis_3, width = 7, height = 5, dpi = 300
   )
 } else {
   ggsave(
@@ -1593,7 +1597,7 @@ if (is_time_based) {
       out_path, "/OptVis3_RecovBased",
       recov_th, "th", mgmt_benefit, "mgmt.png"
     ),
-    plot = opt_vis_3, width = 5, height = 5, dpi = 300
+    plot = opt_vis_3, width = 7, height = 5, dpi = 300
   )
 }
 ############################################
