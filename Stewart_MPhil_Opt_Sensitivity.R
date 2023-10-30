@@ -114,7 +114,7 @@ out_path <- paste0(mphil_path, "/Figures/OptChapter/Sensitivity")
 is_time_based <- FALSE
 
 ### Simulations ###
-# Run simulations? (Much faster if you don"t)
+# Run simulations? (Much faster if you don't)
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
