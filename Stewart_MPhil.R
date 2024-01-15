@@ -89,7 +89,7 @@ sector_boundaries <- st_read(shapefile_path,
 # Should the baseline be inferred if non-existent at start of obs period?
 infer_baseline <- 1
 epsilon <- 0.05
-baseline_str <- "mean"
+baseline_str <- "max"
 
 # Time based or recovery based compounding?
 #  Note: Set to TRUE for time-based compounding or FALSE for recovery-based
@@ -776,20 +776,24 @@ dc_2b <- ggplot() +
 
 p <- ggplot_build(dc_2a)$data[[2]]
 q <- ggplot_build(dc_2b)$data[[2]]
+p$value[p$value == 0] <- NA
+q$value[q$value == 0] <- NA
 
 dc_2a <- dc_2a +
-  scale_fill_gradient2(limits = c(min(p$value, q$value),
-                                  max(p$value, q$value)),
+  scale_fill_gradient2(limits = c(min(p$value, q$value, na.rm = TRUE),
+                                  max(p$value, q$value, na.rm = TRUE)),
                        low = "white",
                        mid = "steelblue1",
-                       high = "steelblue4")
+                       high = "steelblue4",
+                       na.value = "grey")
 
 dc_2b <- dc_2b +
-  scale_fill_gradient2(limits = c(min(p$value, q$value),
-                                  max(p$value, q$value)),
+  scale_fill_gradient2(limits = c(min(p$value, q$value, na.rm = TRUE),
+                                  max(p$value, q$value, na.rm = TRUE)),
                        low = "white",
                        mid = "steelblue1",
-                       high = "steelblue4")
+                       high = "steelblue4",
+                       na.value = "grey")
 
 # Plot of distribution of number of disturbances, split by management area
 #devtools::install_github("iholzleitner/facefuns")
