@@ -82,9 +82,9 @@ sector_boundaries <- st_read(shapefile_path,
 # Variables
 base_recov_th <- 0.75
 base_mgmt_ben <- 0.5
-list_recov_th <- seq(0, 1, by = 0.1)
-list_mgmt_ben <- seq(0, 1, by = 0.1)
-list_recov_yrs <- seq(1, 15, by = 1)
+list_recov_th <- seq(0, 1, by = 0.05)
+list_mgmt_ben <- seq(0, 1, by = 0.05)
+list_recov_yrs <- seq(1, 15, by = 5)
 infer_baseline <- 1 # Should the baseline be inferred if non-existent at start of obs period?
 epsilon <- 0.05
 baseline_str <- "mean"
@@ -118,7 +118,7 @@ is_time_based <- FALSE
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 1000
+n_sims <- 2
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -191,7 +191,7 @@ i = 1
 total = length(list_recov_th) * length(list_mgmt_ben)
 for (recov_th in list_recov_th) {
     for (mgmt_benefit in list_mgmt_ben) {
-        print(paste("Starting i =", i, "out of 121",
+        print(paste("Starting i =", i, "out of", nrow(opt_sensitivity_1),
                     "recov_th =", recov_th, 
                     ", mgmt_benefit =", mgmt_benefit))
         # SINGLE OR COMPOUND DIST
@@ -489,34 +489,6 @@ ggplot(opt_sensitivity_2, aes(x = as.factor(recov_yrs),
 ggsave(paste0(out_path, "/Sensitivity2.png"), 
        plot = last_plot(), 
        width=5, height=5)
-
-# opt_sensitivity_2 <- sens_list_2 %>%
-#     bind_rows()
-# 
-# # Make a new column for the probability of recovery based on whether the reef is managed or not
-# opt_sensitivity_2 <- opt_sensitivity_2 %>%
-#     mutate(pr_recov_sing = ifelse(is_managed_single == 1, pr_recov_comp_mgd, pr_recov_comp_unmgd),
-#            pr_recov_cumul = ifelse(is_managed_cumul == 1,  pr_recov_comp_mgd, pr_recov_comp_unmgd))
-# opt_sensitivity_2_fig <- opt_sensitivity_2 %>%
-#     group_by(sim_num, recov_yrs) %>%
-#     summarise(num_recov_s = 
-#                   sum(pr_recov_sing,
-#                       na.rm = TRUE),
-#               num_recov_c =
-#                   sum(pr_recov_cumul,
-#                       na.rm = TRUE)
-#     )
-# 
-# ggplot(opt_sensitivity_2_fig, aes(x = as.factor(recov_yrs), 
-#                                   y = num_recov_c - num_recov_s)) + 
-#     geom_boxplot() +
-#     labs(x = "Estimated Recovery Time Following Disturbance (Years)",
-#          y = "Difference in average expected number of recovered reefs") +
-#     theme_classic()
-# 
-# ggsave(paste0(out_path, "/Sensitivity2.png"), 
-#        plot = last_plot(), 
-#        width=5, height=5)
 
 ############################################
 

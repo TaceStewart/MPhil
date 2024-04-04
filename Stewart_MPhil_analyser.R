@@ -59,7 +59,7 @@ analyse_reefs <- function(
                 epsilon = epsilon,
                 baseline_str = baseline_str
             )
-
+            
             obs_by_reef <- result_vec[[1]]
         } else {
             result_vec <- single_or_compound(
@@ -73,11 +73,21 @@ analyse_reefs <- function(
                 epsilon = epsilon,
                 baseline_str = baseline_str
             )
-
+            
             obs_by_reef <- result_vec[[1]]
-            baseline_inferred <- result_vec[[2]]
-            baseline_vals <- result_vec[[3]]
         }
+        
+        if (!is.null(result_vec[[2]])) {
+            baseline_inferred <- result_vec[[2]]
+        } else {
+            baseline_inferred <- FALSE
+        }
+        if (!is.null(result_vec[[3]])) {
+            baseline_vals <- result_vec[[3]]
+        } else {
+            baseline_vals <- NULL
+        }
+        
         # Calculate number of years observed inclusive
         yrs_obsvd <- obs_by_reef$YEAR[nrow(obs_by_reef)] - obs_by_reef$YEAR[1] + 1
         # Calculate disturbance probabilities given occurrences
@@ -102,8 +112,8 @@ analyse_reefs <- function(
             prob_s_impact <- 1
         }
         prob_s_recov <- ifelse(any(!is.na(single_dist$r_given_impact)) && 
-                                       !is.na(sd(single_dist$r_given_impact, 
-                                                 na.rm = TRUE)),
+                                   !is.na(sd(single_dist$r_given_impact, 
+                                             na.rm = TRUE)),
                                rnorm(1, 
                                      mean(single_dist$r_given_impact, 
                                           na.rm = TRUE), 
@@ -136,8 +146,8 @@ analyse_reefs <- function(
             prob_c_impact <- 1
         }
         prob_c_recov <- ifelse(any(!is.na(comp_dist$r_given_impact)) && 
-                                       !is.na(sd(comp_dist$r_given_impact[!is.na(comp_dist$r_given_impact)], 
-                                                 na.rm = TRUE)),
+                                   !is.na(sd(comp_dist$r_given_impact[!is.na(comp_dist$r_given_impact)], 
+                                             na.rm = TRUE)),
                                rnorm(1, 
                                      mean(comp_dist$r_given_impact[!is.na(comp_dist$r_given_impact)], na.rm = TRUE), 
                                      sd(comp_dist$r_given_impact[!is.na(comp_dist$r_given_impact)], na.rm = TRUE)
@@ -200,10 +210,10 @@ analyse_reefs <- function(
         coordinates <- st_coordinates(obs_by_reef$geometry)
         latitude <- coordinates[1, 2]
         longitude <- coordinates[1, 1]
-
+        
         ## Get number of total disturbances
         num_total <- sum(obs_by_reef$is_disturbed, na.rm = TRUE)
-
+        
         ## Convert baseline_vals to string
         baseline_vals <- paste(baseline_vals, collapse = ", ")
         
