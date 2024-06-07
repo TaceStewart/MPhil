@@ -11,46 +11,36 @@ cat("\014")
 ############################################
 
 ############## LOAD LIBARIES ###############
-library(sf) # spatial feature handling
-library(lwgeom) # spatial feature handling
-library(dplyr) # dataframe manipulation
-library(varhandle) # handles variables
-library(ompr) # Optimization Modeling Package for R
-library(ompr.roi) # Optimization Modeling Package for R, ROI solver
-library(reshape2) # reshape data
-library(nngeo) # k-Nearest Neighbor Join for Spatial Data
-library(lubridate) # easy and fast parsing of date-times
-library(tidyr) # tidy data
-library(ggpubr) # arranging plots
-library(ROI.plugin.glpk) # GNU Linear Programming Kit
-library(ROI) # R Optimization Infrastructure
-library(ggplot2) # creates plots
-library(latex2exp) # LaTeX for ggplot
-library(patchwork)
-library(ggbump) # Delete in not using for opt vis 2
-library(GGally)
-library(pracma)
+# Check if the required packages are installed and load them
+required_packages <- c("sf", "lwgeom", "dplyr", "varhandle", "ompr", 
+                       "ompr.roi", "reshape2", "nngeo", "lubridate", 
+                       "tidyr", "ggpubr", "ROI.plugin.glpk", "ROI", "ggplot2", 
+                       "latex2exp", "patchwork", "ggbump", "GGally", "pracma")
+new_packages <- required_packages[!(required_packages %in% 
+                                        installed.packages()[,"Package"])]
+if(length(new_packages)) install.packages(new_packages)
+# Load Libraries
+suppressMessages(
+    suppressWarnings(
+        lapply(required_packages, require, character.only = TRUE)
+    )
+)
 
-# Load disturbance and recovery calculators
-source("Stewart_MPhil_single_or_compound.R")
-source("Stewart_MPhil_ortiz_r_func.R")
-source("Stewart_MPhil_p_calc.R")
-source("Stewart_MPhil_optimiser_single.R")
-source("Stewart_MPhil_optimiser_compound.R")
-source("sampler_v2.R")
-source("Stewart_MPhil_dist_finder.R")
-source("Stewart_MPhil_analyser.R")
+# Load custom functions
+source_files <- c("Stewart_MPhil_single_or_compound.R", 
+                  "Stewart_MPhil_ortiz_r_func.R", 
+                  "Stewart_MPhil_p_calc.R", 
+                  "Stewart_MPhil_optimiser_single.R", 
+                  "Stewart_MPhil_optimiser_compound.R", 
+                  "sampler_v2.R", 
+                  "Stewart_MPhil_dist_finder.R", 
+                  "Stewart_MPhil_analyser.R")
+sapply(source_files, source)
 
-# Set path to QUT Drive
+# Set paths
 qut_path <- "../OneDrive - Queensland University of Technology"
-
-# Set the mphil path
 mphil_path <- paste0(qut_path, "/Documents/MPhil")
-
-# Set the data path
 data_path <- paste0(mphil_path, "/Data")
-
-# Set the figure output path
 out_path <- paste0(mphil_path, "/Figures")
 
 # Load disturbances and coral obs (.rds made in code/obs_dist_combine.R)
@@ -80,16 +70,14 @@ sector_boundaries <- st_read(shapefile_path,
 
 ############## SET VARIABLES ###############
 # Variables
-base_recov_th <- 0.75
+base_recov_th <- 0.25
 base_mgmt_ben <- 0.5
 list_recov_th <- seq(0, 1, by = 0.05)
 list_mgmt_ben <- seq(0, 1, by = 0.05)
 list_recov_yrs <- seq(1, 15, by = 5)
 infer_baseline <- 1 # Should the baseline be inferred if non-existent at start of obs period?
 epsilon <- 0.05
-baseline_str <- "mean"
-
-# Management constraint (base: 20% of number of reefs in system)
+baseline_str <- "max"
 mgmt_constraint <- 0.20
 
 # Set GBR MA names in order from north to south
@@ -100,25 +88,15 @@ manament_area_names <- c(
     "Mackay/Capricorn Management Area"
 )
 
-# Set the mphil path
-mphil_path <- "../OneDrive - Queensland University of Technology/Documents/MPhil"
-
-# Set the data path
-data_path <- paste0(mphil_path, "/Data")
-
-# Set the figure output path
-out_path <- paste0(mphil_path, "/Figures/OptChapter/Sensitivity")
-
 # Time based or recovery based compounding?
 #  Note: Set to TRUE for time-based compounding or FALSE for recovery-based
 is_time_based <- FALSE
 
-### Simulations ###
 # Run simulations? (Much faster if you don't)
 run_simulations <- TRUE
 
 # Set number of simulations, n_sims
-n_sims <- 2
+n_sims <- 10000
 
 # Set number of sample reefs, num_samples
 num_samples <- 100
@@ -183,7 +161,21 @@ sens_list_1 = replicate(n = nrow(opt_sensitivity_1),
                         },
                         simplify = F)
 
-
+save_plot_with_date <- function(plot, base_filename, 
+                                width = 7, height = 5, 
+                                dpi = 300) {
+    # Get the current date
+    current_date <- Sys.Date()
+    
+    # Create the filename with the date
+    filename <- paste0(base_filename, "_", current_date, ".png")
+    
+    # Save the plot
+    ggsave(filename, plot = plot, width = width, height = height, dpi = dpi)
+    
+    # Print a message confirming the save
+    message("Plot saved as ", filename)
+}
 ############################################
 
 ########### SENSITIVITY 1 LOOP #############
@@ -297,9 +289,19 @@ for (recov_th in list_recov_th) {
         # Save the results
         sensitivity_row <- which(opt_sensitivity_1$recov_th == recov_th &
                                      opt_sensitivity_1$mgmt_benefit == mgmt_benefit)
-        opt_sensitivity_1[sensitivity_row, "expected_recov_s"] <- mean(expected_recov_reefs_s$num_recov_s)
-        opt_sensitivity_1[sensitivity_row, "expected_recov_c"] <- mean(expected_recov_reefs_c$num_recov_c)
-        opt_sensitivity_1[sensitivity_row, "expected_recov_nm"] <- mean(expected_recov_reefs_nm$num_recov_nm)
+        opt_sensitivity_1[sensitivity_row, 
+                          "expected_recov_s"] <- mean(expected_recov_reefs_s$num_recov_s)
+        opt_sensitivity_1[sensitivity_row, 
+                          "expected_recov_c"] <- mean(expected_recov_reefs_c$num_recov_c)
+        opt_sensitivity_1[sensitivity_row, 
+                          "expected_recov_nm"] <- mean(expected_recov_reefs_nm$num_recov_nm)
+        print(paste("Finished. Expected recovered reefs in general model =", 
+                    round(mean(expected_recov_reefs_s$num_recov_s), 2),
+                    "Expected recovered reefs in cumulative model =", 
+                    round(mean(expected_recov_reefs_c$num_recov_c), 2),
+                    "Expected recovered reefs in no management model =", 
+                    round(mean(expected_recov_reefs_nm$num_recov_nm), 2)
+                    ))
     }
 }
 ############################################
